@@ -54,7 +54,7 @@ npm run dev                     # http://localhost:3000
 | المتغيّر | مطلوب | الوصف |
 |---|---|---|
 | `GEMINI_API_KEY` | ✅ | من <https://aistudio.google.com/apikey> |
-| `GEMINI_MODEL` | — | الافتراضي `gemini-2.5-flash` |
+| `GEMINI_MODEL` | — | الافتراضي `gemini-2.0-flash` |
 | `GEMINI_THINKING_BUDGET` | — | ميزانية «التفكير». الافتراضي `0` على نماذج flash (يمنع الاستجابات الفارغة) |
 | `GEMINI_BASE_URL` | — | الافتراضي `https://generativelanguage.googleapis.com/v1beta` |
 | `TURATH_API_BASE` | — | الافتراضي `https://api.turath.io` |
