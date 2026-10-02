@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
             disagreements: [],
             insufficient: true,
             notice:
-              'هذا السؤال خارج نطاق ما يمكن البحث عنه في المكتبة الشاملة وتراث. ماعون يبحث في كتب التراث الإسلامي فقط.',
+              'هذا السؤال خارج نطاق ما يمكن البحث عنه في المكتبة الشاملة وتراث. حُجَّة يبحث في كتب التراث الإسلامي فقط.',
             createdAt: Date.now(),
           };
           send({ type: 'result', result });

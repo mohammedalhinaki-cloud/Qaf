@@ -96,7 +96,15 @@
   }
 }
 
-@keyframes maoun-pulse {
+/* الشعار النصي «حُجَّة»: تباعد خفيف وضبط ارتفاع السطر حتى لا يُقصّ التشكيل. */
+.brand-wordmark {
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.45;
+  font-feature-settings: 'liga' 1, 'calt' 1;
+}
+
+@keyframes hujjah-pulse {
   0%,
   100% {
     opacity: 0.35;
@@ -107,7 +115,7 @@
 }
 
 .dot-pulse {
-  animation: maoun-pulse 1.3s ease-in-out infinite;
+  animation: hujjah-pulse 1.3s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {

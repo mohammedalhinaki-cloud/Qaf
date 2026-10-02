@@ -21,7 +21,7 @@ import {
 import { AnswerBlock } from './AnswerBlock';
 import { Composer } from './Composer';
 import { IconAlert, IconMenu } from './icons';
-import { Logo } from './Logo';
+import { Logo, Wordmark } from './Logo';
 import { Sidebar } from './Sidebar';
 import { SourceStatusBar } from './SourceStatusBar';
 
@@ -234,7 +234,7 @@ export function ChatShell({ devFixtures = false }: { devFixtures?: boolean }) {
           </button>
           <div className="flex items-center gap-2">
             <Logo size={22} />
-            <span className="text-sm font-bold">ماعون</span>
+            <Wordmark className="text-sm" />
           </div>
           <div className="w-9" aria-hidden="true" />
         </header>
@@ -247,11 +247,16 @@ export function ChatShell({ devFixtures = false }: { devFixtures?: boolean }) {
                 <div className="mb-4 flex justify-center">
                   <Logo size={56} />
                 </div>
-                <h1 className="text-3xl font-bold tracking-tight">ماعون</h1>
+                <h1 className="text-3xl">
+                  <Wordmark />
+                </h1>
+                <p className="mx-auto mt-2 max-w-lg text-[12.5px] leading-6 text-ink-muted">
+                  الذكاء الاصطناعي للتحقق العلمي والبحث في المراجع الإسلامية الصحيحة
+                </p>
                 <p className="mx-auto mt-3 max-w-md text-[13.5px] leading-7 text-ink-muted">
-                  مساعد بحثي يبحث في <strong className="font-semibold text-ink-text">المكتبة الشاملة</strong> و
-                  <strong className="font-semibold text-ink-text"> تراث</strong>، ثم يصوغ إجابة من المقاطع
-                  المسترجَعة ويعرض أدلتها وروابط مصادرها الأصلية.
+                  باحث ذكي يبحث في <strong className="font-semibold text-ink-text">المكتبة الشاملة</strong> و
+                  <strong className="font-semibold text-ink-text"> تراث</strong>، ويعرض الإجابة مع مصادرها
+                  الأصلية للتحقق منها.
                 </p>
               </div>
 
@@ -279,7 +284,7 @@ export function ChatShell({ devFixtures = false }: { devFixtures?: boolean }) {
               </div>
 
               <p className="mt-8 text-center text-[11px] leading-6 text-ink-muted">
-                ماعون أداة بحث وتوثيق، لا يُصدر فتوى ولا يرجّح بين الأقوال. راجع المصدر الأصلي في سياقه قبل
+                حُجَّة أداة بحث وتوثيق، لا يُصدر فتوى ولا يرجّح بين الأقوال. راجع المصدر الأصلي في سياقه قبل
                 الاعتماد عليه.
               </p>
             </div>

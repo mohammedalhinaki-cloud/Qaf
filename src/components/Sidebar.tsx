@@ -2,7 +2,7 @@
 
 import type { Conversation } from '@/lib/types';
 import { IconClose, IconPlus, IconTrash } from './icons';
-import { Logo } from './Logo';
+import { Logo, Wordmark } from './Logo';
 import { ThemeToggle } from './ThemeToggle';
 
 interface Props {
@@ -49,8 +49,8 @@ export function Sidebar({ conversations, activeId, open, onClose, onNew, onSelec
           <div className="flex items-center gap-2.5">
             <Logo size={26} />
             <div className="leading-tight">
-              <div className="text-base font-bold">ماعون</div>
-              <div className="text-[11px] text-ink-muted">بحث موثّق في المصادر</div>
+              <Wordmark className="block text-base" />
+              <div className="text-[11px] text-ink-muted">تحقّق علمي من المراجع</div>
             </div>
           </div>
           <button type="button" onClick={onClose} className="btn !px-2 !py-1.5 md:hidden" aria-label="إغلاق القائمة">

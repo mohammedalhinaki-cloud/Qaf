@@ -158,7 +158,7 @@ export class McpHttpClient {
       {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: {},
-        clientInfo: { name: 'maoun', version: '0.1.0' },
+        clientInfo: { name: 'hujjah', version: '0.1.0' },
       },
       false,
       signal,

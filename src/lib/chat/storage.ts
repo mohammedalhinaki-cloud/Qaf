@@ -7,7 +7,9 @@ import type { ChatMessage, Conversation } from '@/lib/types';
  * لا حسابات ولا خادم ولا إرسال لأي بيانات شخصية.
  */
 
-const KEY = 'maoun.conversations.v1';
+const KEY = 'hujjah.conversations.v1';
+/** مفتاح الاسم السابق — يُقرأ مرة واحدة فقط لترحيل محادثات المستخدمين القدامى. */
+const LEGACY_KEY = 'maoun.conversations.v1';
 const MAX_CONVERSATIONS = 60;
 
 function canUse(): boolean {
@@ -21,7 +23,16 @@ function canUse(): boolean {
 export function loadConversations(): Conversation[] {
   if (!canUse()) return [];
   try {
-    const raw = window.localStorage.getItem(KEY);
+    let raw = window.localStorage.getItem(KEY);
+    if (!raw) {
+      // ترحيل من المفتاح السابق (قبل تغيير الاسم) دون فقدان محادثات المستخدم.
+      const legacy = window.localStorage.getItem(LEGACY_KEY);
+      if (legacy) {
+        window.localStorage.setItem(KEY, legacy);
+        window.localStorage.removeItem(LEGACY_KEY);
+        raw = legacy;
+      }
+    }
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
