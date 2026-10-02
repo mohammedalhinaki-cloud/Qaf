@@ -17,6 +17,26 @@ export const IconSend = (p: P) => (
   </svg>
 );
 
+/** سهم الإرسال الدائري (نمط ChatGPT/Gemini) */
+export const IconArrowUp = (p: P) => (
+  <svg {...base} strokeWidth={2.2} {...p}>
+    <path d="M12 19V5M5.5 11.5 12 5l6.5 6.5" />
+  </svg>
+);
+
+export const IconChevronDown = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="m6 9.5 6 6 6-6" />
+  </svg>
+);
+
+/** مرشّح (فلتر) صغير لشريحة المذهب */
+export const IconFilter = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M4 6h16M7 12h10M10 18h4" />
+  </svg>
+);
+
 export const IconPlus = (p: P) => (
   <svg {...base} {...p}>
     <path d="M12 5v14M5 12h14" />

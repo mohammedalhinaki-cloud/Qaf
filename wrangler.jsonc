@@ -4,6 +4,10 @@
   "name": "qaf",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  // يمنع حذف متغيّرات/أسرار اللوحة عند كل نشر.
+  // بدونه يمسح `wrangler deploy` أي متغيّر نصي أضفته من Cloudflare Dashboard
+  // (ومنها GEMINI_API_KEY) لأنه غير مذكور في هذا الملف.
+  "keep_vars": true,
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"

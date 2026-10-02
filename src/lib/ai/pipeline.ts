@@ -42,7 +42,7 @@ export async function planSearch(
       user: plannerUser(question, history),
       schema: PLANNER_SCHEMA as unknown as Record<string, unknown>,
       temperature: 0.3,
-      maxOutputTokens: 512,
+      maxOutputTokens: 1024,
       signal,
     });
 

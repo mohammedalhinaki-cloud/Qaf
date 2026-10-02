@@ -6,6 +6,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { citationLabel, shortBookTitle, splitAnswerText } from '../src/lib/citations.ts';
+import {
+  GEMINI_KEY_NAMES,
+  cleanSecret,
+  geminiKeyDiagnostics,
+  lookupEnv,
+  resolveGeminiKey,
+} from '../src/lib/env.ts';
 import { neutralizeInstructions, safeSourceUrl, toPlainText, toSnippet } from '../src/lib/security/sanitize.ts';
 import { matchMadhhab } from '../src/lib/search/madhhab.ts';
 import { dedupe, normalizeArabic, scoreEvidence, tokens } from '../src/lib/search/rank.ts';
@@ -201,4 +208,50 @@ test('splitAnswerText يترك الأقواس غير الاستشهادية نص
   assert.equal(cites.length, 1);
   const joined = segs.map((s) => (s.type === 'text' ? s.text : '[استشهاد]')).join('');
   assert.ok(joined.includes('[شرح]'));
+});
+
+/* ———————————— قراءة البيئة والمفتاح ———————————— */
+
+test('cleanSecret ينظّف اللصق الخاطئ للمفتاح', () => {
+  assert.equal(cleanSecret('  AIzaSyTest123  '), 'AIzaSyTest123');
+  assert.equal(cleanSecret('"AIzaSyTest123"'), 'AIzaSyTest123');
+  assert.equal(cleanSecret("'AIzaSyTest123'"), 'AIzaSyTest123');
+  assert.equal(cleanSecret('GEMINI_API_KEY=AIzaSyTest123'), 'AIzaSyTest123');
+  assert.equal(cleanSecret('AIzaSy Test\n123'), 'AIzaSyTest123');
+  assert.equal(cleanSecret(undefined), '');
+});
+
+test('lookupEnv يقرأ من process.env عند الطلب لا عند التحميل', () => {
+  delete process.env.HUJJAH_TEST_KEY;
+  assert.equal(lookupEnv(['HUJJAH_TEST_KEY']), null);
+
+  process.env.HUJJAH_TEST_KEY = ' قيمة ';
+  const hit = lookupEnv(['HUJJAH_TEST_KEY']);
+  assert.equal(hit?.value, 'قيمة');
+  assert.equal(hit?.source, 'process.env');
+  delete process.env.HUJJAH_TEST_KEY;
+});
+
+test('resolveGeminiKey يقبل الأسماء البديلة ويفضّل الاسم الرسمي', () => {
+  for (const n of GEMINI_KEY_NAMES) delete process.env[n];
+  assert.equal(resolveGeminiKey(), null);
+
+  process.env.GEMINI_API_KEY_BUILD = 'AIzaBuildFallback';
+  assert.equal(resolveGeminiKey()?.name, 'GEMINI_API_KEY_BUILD');
+
+  process.env.GEMINI_API_KEY = 'AIzaPrimary';
+  assert.equal(resolveGeminiKey()?.name, 'GEMINI_API_KEY');
+  assert.equal(resolveGeminiKey()?.value, 'AIzaPrimary');
+
+  for (const n of GEMINI_KEY_NAMES) delete process.env[n];
+});
+
+test('geminiKeyDiagnostics لا يكشف قيمة المفتاح', () => {
+  process.env.GEMINI_API_KEY = `AIza${'x'.repeat(35)}`;
+  const d = geminiKeyDiagnostics();
+  assert.equal(d.configured, true);
+  assert.equal(d.name, 'GEMINI_API_KEY');
+  assert.equal(d.looksLikeGoogleKey, true);
+  assert.ok(!JSON.stringify(d).includes('xxxxx'));
+  delete process.env.GEMINI_API_KEY;
 });

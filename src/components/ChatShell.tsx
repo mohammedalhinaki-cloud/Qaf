@@ -21,6 +21,7 @@ import {
 } from '@/lib/types';
 import { AnswerBlock } from './AnswerBlock';
 import { Composer } from './Composer';
+import { ConfigBanner } from './ConfigBanner';
 import { IconAlert, IconBook, IconMenu, IconQuote, IconSearch } from './icons';
 import { Logo, Wordmark } from './Logo';
 import { Sidebar } from './Sidebar';
@@ -218,6 +219,8 @@ export function ChatShell({ devFixtures = false }: { devFixtures?: boolean }) {
       />
 
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <ConfigBanner />
+
         {devFixtures && (
           <div
             className="border-b border-amber-500/40 bg-amber-500/15 px-4 py-2 text-center text-[11.5px]
@@ -351,12 +354,9 @@ export function ChatShell({ devFixtures = false }: { devFixtures?: boolean }) {
               onSubmit={() => void send(input)}
               busy={busy}
               maxChars={MAX_CHARS}
+              caption={LEGAL_NOTICE}
               compact
             />
-
-            <p className="px-2 pt-2 text-center text-xs leading-5 opacity-60">
-              {LEGAL_NOTICE}
-            </p>
           </div>
         </div>
       </main>

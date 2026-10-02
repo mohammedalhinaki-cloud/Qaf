@@ -10,7 +10,7 @@ export const SOURCE_LABEL: Record<SourceId, string> = {
 export type Madhhab = 'all' | 'hanafi' | 'maliki' | 'shafii' | 'hanbali';
 
 export const MADHHAB_LABEL: Record<Madhhab, string> = {
-  all: 'جميع المصادر',
+  all: 'جميع المذاهب',
   hanafi: 'حنفي',
   maliki: 'مالكي',
   shafii: 'شافعي',
