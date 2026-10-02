@@ -1,0 +1,5 @@
+# محليًا فقط مع `npm run preview`؛ لا تضع أسرار الإنتاج هنا.
+NEXTJS_ENV=development
+
+# عند اختبار Gemini محليًا فقط، انسخ هذا الملف إلى .dev.vars وأضف القيمة:
+# GEMINI_API_KEY=

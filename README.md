@@ -86,7 +86,14 @@ npm run dev                     # http://localhost:3000
 
 ### النشر على Cloudflare والنطاق
 
-ادفع المشروع إلى Cloudflare Pages/Workers (باستخدام إعداد Next.js المناسب في حسابك)، ثم أضف `GEMINI_API_KEY` كـ Secret على الخادم. لا حاجة إلى قاعدة بيانات.
+هذا المشروع مُعَدّ لـ **Cloudflare Workers عبر OpenNext**، لا لـ Cloudflare Pages/static export؛ لأن المسارين `/api/ask` و`/api/health` يحتاجان تنفيذًا خادميًا ومفتاح Gemini سريًا.
+
+```bash
+npm run preview  # يبني التطبيق ويشغّله محليًا على runtime Workers
+npm run deploy   # يبني وينشر Worker باسم qaf
+```
+
+أضف `GEMINI_API_KEY` كـ **Secret** من Cloudflare Workers → `qaf` → Settings → Variables and Secrets. لا حاجة إلى قاعدة بيانات أو Supabase في النسخة الحالية.
 
 **النطاق المقصود لهذا المشروع هو النطاق الفرعي فقط:**
 
@@ -94,9 +101,9 @@ npm run dev                     # http://localhost:3000
 hujjah.maaoun.com
 ```
 
-- أضف النطاق الفرعي من Cloudflare Pages → Custom domains، أو أنشئ `CNAME` باسم `hujjah` إلى عنوان Pages الذي تعرضه Cloudflare.
-- لا تضف `maaoun.com` أو `www.maaoun.com` إلى هذا المشروع، ولا تنشئ إعادة توجيه منهما إلى حُجَّة.
-- يتأكد `src/middleware.ts` من المضيف ويرفض الطلبات الواردة على أي نطاق آخر؛ لذلك لا يمكن للتطبيق أن يتقمص الموقع الرئيسي إذا أُضيف نطاق خاطئ.
+- من Cloudflare Workers → `qaf` → Settings → Domains & Routes، أضف `hujjah.maaoun.com` كـ **Custom Domain**. ينشئ Cloudflare سجل DNS والشهادة تلقائيًا عندما تكون zone `maaoun.com` في الحساب نفسه.
+- لا تضف `maaoun.com` أو `www.maaoun.com` كـ Custom Domain أو Worker Route لهذا الـ Worker، ولا تنشئ إعادة توجيه منهما إلى حُجَّة.
+- اسم الـ Worker الداخلي هو `qaf`، وقيمة `WORKER_SELF_REFERENCE` في `wrangler.jsonc` هي `qaf` كذلك؛ لا تغيّر أحدهما دون الآخر.
 - `metadataBase` و Open Graph و`canonical` مضبوطة على `https://hujjah.maaoun.com`، كما أن عنوان ووصف SEO والكلمات المفتاحية مضبوطة في `src/app/layout.tsx`.
 - اترك إدارة `maaoun.com` ومحتواه في إعداد Cloudflare الأصلي، منفصلًا عن خدمة حُجَّة.
 
