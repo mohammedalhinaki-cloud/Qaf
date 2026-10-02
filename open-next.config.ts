@@ -5,4 +5,11 @@ import { defineCloudflareConfig } from '@opennextjs/cloudflare';
  * جميع مسارات API ديناميكية، وOpenNext يستخدم cache dummy الآمن افتراضيًا
  * إلى أن تُضاف ميزة Next.js ISR فعلية تستدعي تخزين cache دائمًا.
  */
-export default defineCloudflareConfig({});
+const config = defineCloudflareConfig({});
+
+// `npm run build` يستدعي `opennextjs-cloudflare build`، والافتراضي لدى OpenNext
+// هو تشغيل `npm run build` داخليًا لبناء Next.js — ما يسبب حلقة لا نهائية.
+// نحدد أمر البناء الداخلي صراحةً لكسر الحلقة.
+config.buildCommand = 'npx next build';
+
+export default config;

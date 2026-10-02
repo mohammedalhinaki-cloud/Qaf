@@ -20,6 +20,9 @@ const nextConfig: NextConfig = {
 
 export default nextConfig;
 
-// يهيّئ bindings الخاصة بـ Cloudflare عند استخدام `next dev` محليًا.
-// لا يغيّر سلوك Next.js في الإنتاج؛ إنتاج Worker يتم عبر OpenNext.
-import('@opennextjs/cloudflare').then((m) => m.initOpenNextCloudflareForDev());
+// يهيّئ bindings الخاصة بـ Cloudflare عند استخدام `next dev` محليًا فقط.
+// لا يجب تشغيله أثناء `next build`: فهو يقلع workerd/miniflare ويسبب
+// تعارض أقفال SQLite (SQLITE_BUSY) عند البناء عبر OpenNext.
+if (process.env.NODE_ENV === 'development') {
+  import('@opennextjs/cloudflare').then((m) => m.initOpenNextCloudflareForDev());
+}

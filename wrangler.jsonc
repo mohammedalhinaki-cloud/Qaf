@@ -16,5 +16,11 @@
   ],
   "images": {
     "binding": "IMAGES"
+  },
+  // Required by `wrangler preview`. Secrets are NOT committed here:
+  // `scripts/prepare-preview.mjs` (run during `npm run build`) injects
+  // preview vars (e.g. GEMINI_API_KEY) from the environment at build time.
+  "previews": {
+    "vars": {}
   }
 }
