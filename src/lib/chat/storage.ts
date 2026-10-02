@@ -1,0 +1,77 @@
+'use client';
+
+import type { ChatMessage, Conversation } from '@/lib/types';
+
+/**
+ * تخزين المحادثات محليًا في المتصفح (localStorage).
+ * لا حسابات ولا خادم ولا إرسال لأي بيانات شخصية.
+ */
+
+const KEY = 'maoun.conversations.v1';
+const MAX_CONVERSATIONS = 60;
+
+function canUse(): boolean {
+  try {
+    return typeof window !== 'undefined' && !!window.localStorage;
+  } catch {
+    return false;
+  }
+}
+
+export function loadConversations(): Conversation[] {
+  if (!canUse()) return [];
+  try {
+    const raw = window.localStorage.getItem(KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return (parsed as Conversation[])
+      .filter((c) => c && typeof c.id === 'string' && Array.isArray(c.messages))
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  } catch {
+    return [];
+  }
+}
+
+export function saveConversations(list: Conversation[]): void {
+  if (!canUse()) return;
+  try {
+    const trimmed = [...list].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, MAX_CONVERSATIONS);
+    window.localStorage.setItem(KEY, JSON.stringify(trimmed));
+  } catch {
+    /* قد تمتلئ المساحة — نتجاهل بصمت ولا نكسر الواجهة */
+  }
+}
+
+export function newId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/** عنوان تلقائي من السؤال الأول. */
+export function titleFromQuestion(q: string): string {
+  const clean = q.replace(/\s+/g, ' ').trim();
+  if (clean.length <= 42) return clean || 'محادثة جديدة';
+  return `${clean.slice(0, 42).trimEnd()}…`;
+}
+
+export function createConversation(): Conversation {
+  const now = Date.now();
+  return { id: newId(), title: 'محادثة جديدة', messages: [], createdAt: now, updatedAt: now };
+}
+
+export function upsertMessage(conv: Conversation, message: ChatMessage): Conversation {
+  const idx = conv.messages.findIndex((m) => m.id === message.id);
+  const messages =
+    idx >= 0
+      ? conv.messages.map((m) => (m.id === message.id ? message : m))
+      : [...conv.messages, message];
+
+  const firstUser = messages.find((m) => m.role === 'user');
+  const title =
+    conv.title === 'محادثة جديدة' && firstUser?.content
+      ? titleFromQuestion(firstUser.content)
+      : conv.title;
+
+  return { ...conv, messages, title, updatedAt: Date.now() };
+}

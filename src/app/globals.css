@@ -1,0 +1,121 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --c-bg: 250 250 249;
+    --c-panel: 255 255 255;
+    --c-line: 231 229 228;
+    --c-text: 28 25 23;
+    --c-muted: 120 113 108;
+    --c-accent: 13 115 119;
+  }
+
+  .dark {
+    --c-bg: 17 20 24;
+    --c-panel: 24 28 33;
+    --c-line: 44 50 58;
+    --c-text: 237 238 240;
+    --c-muted: 150 158 168;
+    --c-accent: 94 199 192;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: rgb(var(--c-bg));
+    color: rgb(var(--c-text));
+    font-feature-settings: 'kern', 'liga';
+    text-rendering: optimizeLegibility;
+  }
+
+  /* قراءة طويلة مريحة بالعربية */
+  .prose-ar {
+    line-height: 2.05;
+    letter-spacing: 0;
+    word-spacing: 0.02em;
+  }
+
+  .prose-ar p {
+    margin-bottom: 0.9rem;
+  }
+
+  ::selection {
+    background-color: rgb(var(--c-accent) / 0.22);
+  }
+
+  /* شريط تمرير هادئ */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--c-line)) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: rgb(var(--c-line));
+    border-radius: 9999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(var(--c-accent));
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-ink-line
+           px-3.5 py-2 text-sm font-medium text-ink-text transition-colors
+           hover:bg-ink-line/40 disabled:cursor-not-allowed disabled:opacity-45;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-ink-accent px-4 py-2
+           text-sm font-semibold text-white transition-opacity hover:opacity-90
+           disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .card {
+    @apply rounded-2xl border border-ink-line bg-ink-panel;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-lg border border-ink-line px-2.5 py-1
+           text-xs text-ink-muted;
+  }
+}
+
+@keyframes maoun-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.dot-pulse {
+  animation: maoun-pulse 1.3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
