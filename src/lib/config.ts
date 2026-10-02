@@ -3,9 +3,32 @@
  * لا يوجد أي مفتاح أو سر في هذا الملف، ولا يُستورد من مكوّنات العميل.
  */
 
+function cleanSecret(value: string | undefined): string {
+  if (!value) return '';
+  const trimmed = value.trim();
+  // بعض لوحات الاستضافة تحفظ علامتَي الاقتباس عند لصق السر.
+  if (
+    trimmed.length >= 2 &&
+    ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+      (trimmed.startsWith("'") && trimmed.endsWith("'")))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
+
 function envStr(key: string, fallback: string): string {
   const v = process.env[key];
   return v && v.trim().length > 0 ? v.trim() : fallback;
+}
+
+function geminiApiKey(): string {
+  // GEMINI_API_KEY هو الاسم الأساسي، والاسمان الآخران للتوافق مع أشهر منصات النشر.
+  return cleanSecret(
+    process.env.GEMINI_API_KEY ??
+      process.env.GOOGLE_API_KEY ??
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+  );
 }
 
 function envBool(key: string, fallback: boolean): boolean {
@@ -21,7 +44,7 @@ function envInt(key: string, fallback: number): number {
 
 export const config = {
   gemini: {
-    apiKey: process.env.GEMINI_API_KEY ?? '',
+    apiKey: geminiApiKey(),
     model: envStr('GEMINI_MODEL', 'gemini-2.5-flash'),
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
   },
