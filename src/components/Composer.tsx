@@ -83,7 +83,7 @@ export function Composer({
   }
 
   return (
-    <div className="card overflow-hidden shadow-sm">
+    <div className="card overflow-hidden rounded-[28px] shadow-sm transition-shadow focus-within:border-ink-accent/40 focus-within:shadow-md">
       <label htmlFor="hujjah-q" className="sr-only">
         اكتب سؤالك
       </label>
