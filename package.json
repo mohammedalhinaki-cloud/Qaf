@@ -8,7 +8,7 @@
     "start": "next start -H 0.0.0.0",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "test": "node --experimental-strip-types --import ./tests/alias-loader.mjs --test tests/*.test.ts",
     "preview": "npm run build && opennextjs-cloudflare preview",
     "deploy": "npm run build && opennextjs-cloudflare deploy -- --keep-vars",
     "upload": "npm run build && opennextjs-cloudflare upload -- --keep-vars",

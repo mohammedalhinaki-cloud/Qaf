@@ -9,12 +9,12 @@ export interface AskRequestBody {
 }
 
 export class ValidationError extends Error {
-  constructor(
-    message: string,
-    public code: string,
-  ) {
+  public code: string;
+
+  constructor(message: string, code: string) {
     super(message);
     this.name = 'ValidationError';
+    this.code = code;
   }
 }
 
