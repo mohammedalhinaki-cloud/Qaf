@@ -83,12 +83,100 @@ interface RawResult {
   detail: string;
 }
 
+/* ———————————————— اكتشاف نموذج بديل تلقائيًا ————————————————
+ * بعض المفاتيح لا تتاح لها كل النماذج (مشاريع مقيّدة، إصدارات قديمة…).
+ * عند 404 على النموذج المضبوط، نسأل Google عن النماذج المتاحة فعلًا لهذا
+ * المفتاح ونختار أفضل بديل، ثم نحفظه في الذاكرة كي لا نكرّر الاستعلام.
+ */
+
+/** ترتيب التفضيل عند البحث عن بديل. */
+const FALLBACK_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-flash-latest',
+  'gemini-2.5-flash-lite',
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-001',
+  'gemini-1.5-flash',
+  'gemini-1.5-flash-latest',
+  'gemini-2.5-pro',
+  'gemini-pro-latest',
+  'gemini-1.5-pro',
+];
+
+/** نماذج لا تصلح للتوليد النصي المهيكل. */
+const UNSUITABLE_MODEL = /embedding|imagen|veo|-tts|-live|audio|image-generation|aqa/i;
+
+let modelCache: { fingerprint: string; model: string } | null = null;
+
+function cacheFingerprint(key: string): string {
+  return `${config.gemini.baseUrl}|${config.gemini.model}|${key.slice(-6)}`;
+}
+
+/** النموذج الفعلي المستعمل: المضبوط، أو البديل المكتشف سابقًا لهذا المفتاح. */
+function activeModel(key: string): string {
+  return modelCache && modelCache.fingerprint === cacheFingerprint(key)
+    ? modelCache.model
+    : config.gemini.model;
+}
+
+interface ListedModel {
+  name?: string;
+  supportedGenerationMethods?: string[];
+}
+
+/** يسأل Google عن النماذج المتاحة لهذا المفتاح ويعيد أسماءها المختصرة. */
+async function listAvailableModels(key: string, signal?: AbortSignal): Promise<string[]> {
+  try {
+    const res = await fetch(`${config.gemini.baseUrl}/models?pageSize=200`, {
+      headers: { 'x-goog-api-key': key },
+      signal: signal ?? AbortSignal.timeout(10_000),
+      cache: 'no-store',
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { models?: ListedModel[] };
+    return (data.models ?? [])
+      .filter((m) => (m.supportedGenerationMethods ?? []).includes('generateContent'))
+      .map((m) => (m.name ?? '').replace(/^models\//, ''))
+      .filter((n) => n && !UNSUITABLE_MODEL.test(n));
+  } catch {
+    return [];
+  }
+}
+
+/** يختار أفضل بديل من قائمة النماذج المتاحة، أو null إن لم يوجد. */
+function pickFallback(available: string[], exclude: string): string | null {
+  const set = new Set(available);
+  for (const name of FALLBACK_MODELS) {
+    if (name !== exclude && set.has(name)) return name;
+  }
+  // أي نموذج flash متاح، ثم أي نموذج توليد نصي.
+  const flash = available.find((n) => n !== exclude && /flash/i.test(n));
+  if (flash) return flash;
+  return available.find((n) => n !== exclude) ?? null;
+}
+
+/**
+ * عند 404: يكتشف بديلًا متاحًا ويحفظه. يعيد اسم البديل أو null.
+ */
+async function discoverFallbackModel(key: string, signal?: AbortSignal): Promise<string | null> {
+  const available = await listAvailableModels(key, signal);
+  const fallback = pickFallback(available, config.gemini.model);
+  if (fallback) {
+    modelCache = { fingerprint: cacheFingerprint(key), model: fallback };
+    console.warn(
+      `[gemini] النموذج «${config.gemini.model}» غير متاح لهذا المفتاح؛ تم التحويل تلقائيًا إلى «${fallback}».`,
+    );
+  }
+  return fallback;
+}
+
 async function callGemini(
   key: string,
+  model: string,
   body: Record<string, unknown>,
   signal: AbortSignal,
 ): Promise<RawResult> {
-  const url = `${config.gemini.baseUrl}/models/${encodeURIComponent(config.gemini.model)}:generateContent`;
+  const url = `${config.gemini.baseUrl}/models/${encodeURIComponent(model)}:generateContent`;
 
   let res: Response;
   try {
@@ -143,12 +231,22 @@ export async function generateJson<T>(opts: GenerateOptions): Promise<T> {
   const timeout = AbortSignal.timeout(config.limits.aiTimeoutMs);
   const signal = opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout;
 
-  let result = await callGemini(key, body, signal);
+  let model = activeModel(key);
+  let result = await callGemini(key, model, body, signal);
+
+  // النموذج المضبوط غير متاح لهذا المفتاح: نكتشف بديلًا متاحًا ونعيد المحاولة.
+  if (!result.ok && result.status === 404) {
+    const fallback = await discoverFallbackModel(key, signal);
+    if (fallback && fallback !== model) {
+      model = fallback;
+      result = await callGemini(key, model, body, signal);
+    }
+  }
 
   // بعض النماذج لا تقبل thinkingConfig: نعيد المحاولة مرة واحدة بدونه.
   if (!result.ok && result.status === 400 && isThinkingUnsupported(result.detail)) {
     delete (body.generationConfig as Record<string, unknown>).thinkingConfig;
-    result = await callGemini(key, body, signal);
+    result = await callGemini(key, model, body, signal);
   }
 
   const { ok, status, data, detail } = result;
@@ -164,7 +262,7 @@ export async function generateJson<T>(opts: GenerateOptions): Promise<T> {
   }
   if (status === 404) {
     throw new GeminiError(
-      `النموذج «${config.gemini.model}» غير متاح لهذا المفتاح. غيّر GEMINI_MODEL إلى نموذج متاح.`,
+      `النموذج «${config.gemini.model}» غير متاح لهذا المفتاح، ولم يُعثر على أي نموذج بديل متاح له. تحقّق من المفتاح أو غيّر GEMINI_MODEL.`,
       'model_not_found',
     );
   }
@@ -235,7 +333,8 @@ export async function pingGemini(): Promise<GeminiPing> {
     };
   }
 
-  const url = `${config.gemini.baseUrl}/models/${encodeURIComponent(config.gemini.model)}`;
+  const model = activeModel(hit.value);
+  const url = `${config.gemini.baseUrl}/models/${encodeURIComponent(model)}`;
 
   try {
     const res = await fetch(url, {
@@ -251,9 +350,26 @@ export async function pingGemini(): Promise<GeminiPing> {
         ok: true,
         status: res.status,
         code: null,
-        message: 'المفتاح يعمل والنموذج متاح.',
+        message:
+          model === config.gemini.model
+            ? 'المفتاح يعمل والنموذج متاح.'
+            : `المفتاح يعمل. النموذج المضبوط «${config.gemini.model}» غير متاح، ويُستعمل بدلًا منه «${model}» تلقائيًا.`,
         tookMs,
       };
+    }
+
+    // النموذج المضبوط غير متاح: نحاول اكتشاف بديل متاح لهذا المفتاح.
+    if (res.status === 404) {
+      const fallback = await discoverFallbackModel(hit.value);
+      if (fallback) {
+        return {
+          ok: true,
+          status: 200,
+          code: null,
+          message: `النموذج «${config.gemini.model}» غير متاح لهذا المفتاح؛ سيُستعمل «${fallback}» تلقائيًا.`,
+          tookMs: Date.now() - t0,
+        };
+      }
     }
 
     let detail = '';
@@ -277,7 +393,7 @@ export async function pingGemini(): Promise<GeminiPing> {
       code === 'auth'
         ? 'المفتاح موجود لكن Google رفضه (غير صالح أو مقيَّد أو الواجهة غير مفعّلة).'
         : code === 'model_not_found'
-          ? `النموذج «${config.gemini.model}» غير متاح لهذا المفتاح.`
+          ? `النموذج «${config.gemini.model}» غير متاح لهذا المفتاح، ولا يوجد بديل متاح له.`
           : code === 'rate_limit'
             ? 'تم تجاوز حدّ الاستخدام مؤقتًا.'
             : scrub(detail || `استجابة غير متوقّعة (${res.status}).`, hit.value);
