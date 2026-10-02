@@ -1,62 +1,67 @@
 /**
- * إعدادات التطبيق. تُقرأ من متغيرات البيئة فقط على الخادم.
+ * إعدادات التطبيق. تُقرأ من متغيّرات البيئة على الخادم فقط.
  * لا يوجد أي مفتاح أو سر في هذا الملف، ولا يُستورد من مكوّنات العميل.
+ *
+ * مهم: كل القيم هنا **كسولة** (getters) وتُقرأ لحظة الاستعمال، لأن أسرار
+ * Cloudflare Workers لا تتوفّر وقت تحميل الوحدات. انظر `src/lib/env.ts`.
  */
 
-function cleanSecret(value: string | undefined): string {
-  if (!value) return '';
-  const trimmed = value.trim();
-  // بعض لوحات الاستضافة تحفظ علامتَي الاقتباس عند لصق السر.
-  if (
-    trimmed.length >= 2 &&
-    ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-      (trimmed.startsWith("'") && trimmed.endsWith("'")))
-  ) {
-    return trimmed.slice(1, -1).trim();
+import { envBool, envInt, envString, resolveGeminiKey } from '@/lib/env';
+
+export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
+export const DEFAULT_GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
+
+/**
+ * ميزانية «التفكير» في نماذج 2.5: القيمة 0 تعطّل التفكير.
+ * بدون تعطيله قد يستهلك النموذج كامل maxOutputTokens في التفكير
+ * ويعيد استجابة فارغة — وهو عطل يُفسَّر خطأً على أنه مشكلة في المفتاح.
+ */
+function thinkingBudget(): number | null {
+  const raw = envString('GEMINI_THINKING_BUDGET', '');
+  if (raw.length > 0) {
+    const n = Number.parseInt(raw, 10);
+    return Number.isFinite(n) && n >= 0 ? n : null;
   }
-  return trimmed;
-}
-
-function envStr(key: string, fallback: string): string {
-  const v = process.env[key];
-  return v && v.trim().length > 0 ? v.trim() : fallback;
-}
-
-function geminiApiKey(): string {
-  // GEMINI_API_KEY هو الاسم الأساسي، والاسمان الآخران للتوافق مع أشهر منصات النشر.
-  return cleanSecret(
-    process.env.GEMINI_API_KEY ??
-      process.env.GOOGLE_API_KEY ??
-      process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-  );
-}
-
-function envBool(key: string, fallback: boolean): boolean {
-  const v = process.env[key];
-  if (v === undefined) return fallback;
-  return /^(1|true|yes|on)$/i.test(v.trim());
-}
-
-function envInt(key: string, fallback: number): number {
-  const v = Number.parseInt(process.env[key] ?? '', 10);
-  return Number.isFinite(v) && v > 0 ? v : fallback;
+  // الافتراضي: تعطيل التفكير على نماذج flash فقط (pro لا يقبل 0).
+  const model = envString('GEMINI_MODEL', DEFAULT_GEMINI_MODEL).toLowerCase();
+  return /(^|[-/])gemini-(2\.5|3)[^/]*flash/.test(model) ? 0 : null;
 }
 
 export const config = {
   gemini: {
-    apiKey: geminiApiKey(),
-    model: envStr('GEMINI_MODEL', 'gemini-2.5-flash'),
-    baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    /** يُقرأ عند كل استعمال من process.env ثم من سياق Cloudflare. */
+    get apiKey(): string {
+      return resolveGeminiKey()?.value ?? '';
+    },
+    get model(): string {
+      return envString('GEMINI_MODEL', DEFAULT_GEMINI_MODEL);
+    },
+    get baseUrl(): string {
+      return envString('GEMINI_BASE_URL', DEFAULT_GEMINI_BASE_URL).replace(/\/+$/, '');
+    },
+    get thinkingBudget(): number | null {
+      return thinkingBudget();
+    },
   },
   turath: {
-    enabled: envBool('TURATH_ENABLED', true),
-    apiBase: envStr('TURATH_API_BASE', 'https://api.turath.io'),
-    appBase: envStr('TURATH_APP_BASE', 'https://app.turath.io'),
+    get enabled(): boolean {
+      return envBool('TURATH_ENABLED', true);
+    },
+    get apiBase(): string {
+      return envString('TURATH_API_BASE', 'https://api.turath.io');
+    },
+    get appBase(): string {
+      return envString('TURATH_APP_BASE', 'https://app.turath.io');
+    },
     apiVersion: 3,
   },
   limits: {
-    ratePerMinute: envInt('RATE_LIMIT_PER_MINUTE', 10),
-    maxQuestionChars: envInt('MAX_QUESTION_CHARS', 500),
+    get ratePerMinute(): number {
+      return envInt('RATE_LIMIT_PER_MINUTE', 10);
+    },
+    get maxQuestionChars(): number {
+      return envInt('MAX_QUESTION_CHARS', 500);
+    },
     /** أقصى عدد مقاطع تُمرّر إلى النموذج */
     maxEvidence: 12,
     /** أقصى عدد أحرف من نص المقطع الواحد يُمرّر إلى النموذج */

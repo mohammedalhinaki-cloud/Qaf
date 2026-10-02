@@ -1,5 +1,7 @@
-# محليًا فقط مع `npm run preview`؛ لا تضع أسرار الإنتاج هنا.
+# محليًا فقط مع `npm run preview` (يشغّل الـ Worker عبر wrangler).
+# لا تضع أسرار الإنتاج هنا، والملف مستبعَد من Git.
 NEXTJS_ENV=development
 
-# عند اختبار Gemini محليًا فقط، انسخ هذا الملف إلى .dev.vars وأضف القيمة:
+# عند اختبار Gemini على runtime الـ Worker محليًا، انسخ هذا الملف إلى .dev.vars
+# وأضف المفتاح. (`next dev` يقرأ .env.local بدل هذا الملف.)
 # GEMINI_API_KEY=

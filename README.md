@@ -55,6 +55,8 @@ npm run dev                     # http://localhost:3000
 |---|---|---|
 | `GEMINI_API_KEY` | ✅ | من <https://aistudio.google.com/apikey> |
 | `GEMINI_MODEL` | — | الافتراضي `gemini-2.5-flash` |
+| `GEMINI_THINKING_BUDGET` | — | ميزانية «التفكير». الافتراضي `0` على نماذج flash (يمنع الاستجابات الفارغة) |
+| `GEMINI_BASE_URL` | — | الافتراضي `https://generativelanguage.googleapis.com/v1beta` |
 | `TURATH_API_BASE` | — | الافتراضي `https://api.turath.io` |
 | `TURATH_APP_BASE` | — | الافتراضي `https://app.turath.io` |
 | `TURATH_ENABLED` | — | `false` لتعطيل مصدر البحث |
@@ -62,7 +64,16 @@ npm run dev                     # http://localhost:3000
 | `MAX_QUESTION_CHARS` | — | الافتراضي `500` |
 | `HUJJAH_DEV_FIXTURES` | — | وضع التطوير فقط (لا يعمل في الإنتاج) |
 
-**المفتاح يُقرأ على الخادم فقط.** لا يصل إلى المتصفح، ولا يظهر في أي سجل، وتُنقّى رسائل أخطاء Gemini منه قبل عرضها.
+أسماء بديلة مقبولة للمفتاح نفسه (للتوافق مع منصات النشر): `GOOGLE_API_KEY`، `GOOGLE_GENERATIVE_AI_API_KEY`، `GOOGLE_AI_API_KEY`، وأخيرًا `GEMINI_API_KEY_BUILD` (احتياطي يُحقن من بيئة البناء في CI فقط).
+
+**المفتاح يُقرأ على الخادم فقط.** لا يصل إلى المتصفح، ولا يظهر في أي سجل، وتُنقّى رسائل أخطاء Gemini منه قبل عرضها. ويُقرأ **لحظة الطلب** من `process.env` ثم من سياق Cloudflare — لا عند تحميل الوحدات — لأن أسرار Workers لا تكون جاهزة وقت التحميل.
+
+للتحقق السريع من المفتاح:
+
+```bash
+npm run check:gemini                                 # يفحص المفتاح محليًا لدى Google
+npm run check:gemini -- https://hujjah.maaoun.com    # يفحص النسخة المنشورة
+```
 
 ### النشر على Cloudflare والنطاق
 
@@ -73,9 +84,31 @@ npm run preview  # يبني التطبيق ويشغّله محليًا على ru
 npm run deploy   # يبني وينشر Worker باسم qaf
 ```
 
-عند استخدام Cloudflare Workers Builds حيث يكون أمر البناء `npm run build` وأمر النشر `npx wrangler preview`، فإن `npm run build` يقوم الآن بثلاث خطوات: `next build` ثم تحويل OpenNext إلى `.open-next` ثم حقن قيم `previews.vars` المطلوبة في `wrangler.jsonc` من متغيرات البيئة داخل بيئة البناء.
+`npm run build` ينفّذ ثلاث خطوات: `next build` ← تحويل OpenNext إلى `.open-next` ← فحص مفتاح Gemini (`scripts/prepare-preview.mjs`) الذي يطبع في سجل البناء هل المفتاح متاح ومن أين. محليًا لا يعدّل هذا السكربت أي ملف؛ وداخل CI فقط — وإن وُجد المفتاح في بيئة البناء — يحقنه في `wrangler.jsonc` باسم احتياطي `GEMINI_API_KEY_BUILD` حتى لا يصطدم بالسرّ الحقيقي ولا يحوّله إلى نص ظاهر.
 
-أضف `GEMINI_API_KEY` كـ **Secret** من Cloudflare Workers → `qaf` → Settings → Variables and Secrets، واجعله متاحًا كذلك لبيئة الـ Preview/Build. لا تضع المفتاح داخل `wrangler.jsonc` في Git. لا حاجة إلى قاعدة بيانات أو Supabase في النسخة الحالية.
+### ⚠️ مفتاح Gemini على Cloudflare: الإعداد الصحيح
+
+1. **اضبطه كـ Secret لوقت التشغيل**: Cloudflare → Workers & Pages → `qaf` → **Settings → Variables and Secrets** → Add → **Type: Secret** → Name: `GEMINI_API_KEY` → Deploy.
+   أو من الطرفية: `npx wrangler secret put GEMINI_API_KEY`
+2. **«Build variables and secrets» ليست كافية.** متغيّرات البناء تصل إلى `next build` فقط ولا يراها الـ Worker أثناء التشغيل. هذا أشهر سبب لرسالة «مفتاح Gemini غير مضبوط» رغم أن المفتاح يبدو مضبوطًا في اللوحة.
+3. **لا تحذف متغيّرات اللوحة عند النشر**: `wrangler deploy` يمسح المتغيّرات النصية غير المذكورة في ملف الإعداد. لذلك أُضيف `"keep_vars": true` في `wrangler.jsonc`، وأمر النشر صار `opennextjs-cloudflare deploy -- --keep-vars`.
+4. **تأكّد من الـ Worker الصحيح**: الاسم هنا `qaf`. ضبط السرّ على Worker آخر أو على مشروع Pages لا يفيد.
+5. **بعد النشر تحقّق فعليًا**:
+
+```bash
+curl -s 'https://hujjah.maaoun.com/api/health?probe=1' | jq '.ai, .probe.gemini'
+```
+
+يبيّن الناتج: هل وُجد المفتاح (`ai.key.found`)، ومن أي متغيّر (`ai.key.variable`)، ومن أي مصدر (`process.env` أو `cloudflare`)، وهل قبِله Google فعلًا (`probe.gemini.ok`). ولا تُكشف قيمة المفتاح في أي حال.
+
+| ما تراه | المعنى | الإصلاح |
+|---|---|---|
+| `key.found = false` | الـ Worker لا يرى المفتاح | أضفه كـ Secret لوقت التشغيل ثم أعد النشر |
+| `probe.gemini.code = "auth"` | Google رفض المفتاح | مفتاح خاطئ/مقيَّد، أو الواجهة غير مفعّلة لمشروعه |
+| `probe.gemini.code = "model_not_found"` | المفتاح سليم والنموذج غير متاح | غيّر `GEMINI_MODEL` |
+| `probe.gemini.code = "rate_limit"` | تجاوز الحصّة | انتظر أو ارفع الحصّة |
+
+لا تضع المفتاح داخل `wrangler.jsonc` في Git. لا حاجة إلى قاعدة بيانات أو Supabase في النسخة الحالية.
 
 **النطاق المقصود لهذا المشروع هو النطاق الفرعي فقط:**
 
@@ -92,7 +125,7 @@ hujjah.maaoun.com
 ### الاختبارات
 
 ```bash
-npm test        # 21 اختبارًا لمنطق التنظيف والترتيب والمذهب والاستشهادات (بلا شبكة)
+npm test        # 25 اختبارًا لمنطق التنظيف والترتيب والمذهب والاستشهادات وقراءة المفتاح (بلا شبكة)
 npm run build
 ```
 

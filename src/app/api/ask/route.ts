@@ -57,7 +57,8 @@ export async function POST(req: NextRequest) {
 
   if (!isGeminiConfigured()) {
     return jsonError(
-      'النظام غير مهيّأ: مفتاح Gemini غير مضبوط على الخادم. أضف GEMINI_API_KEY في متغيرات البيئة.',
+      'النظام غير مهيّأ: مفتاح Gemini غير مضبوط على الخادم. أضف GEMINI_API_KEY كـ Secret في ' +
+        'متغيّرات البيئة ثم أعد النشر. لمعرفة التفاصيل افتح المسار /api/health?probe=1',
       503,
       'missing_key',
     );
