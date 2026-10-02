@@ -6,22 +6,28 @@ import { resolveGeminiKey } from '@/lib/env';
  * عند تحميل الوحدة — ولا يُرسل إلى المتصفح ولا يُسجَّل في أي مكان.
  */
 
+export type GeminiErrorCode =
+  | 'missing_key'
+  | 'auth'
+  | 'rate_limit'
+  | 'timeout'
+  | 'bad_response'
+  | 'blocked'
+  | 'model_not_found'
+  | 'truncated'
+  | 'overloaded'
+  | 'upstream';
+
+// ملاحظة: نتجنّب خصائص المُنشئ المختصرة (parameter properties) هنا عمدًا؛
+// وضع التجريد الخالص للأنواع (type-stripping، مثل --experimental-strip-types
+// في Node) لا يدعم هذه الصياغة، وهذا يكسر تحميل الوحدة وقت الاختبار.
 export class GeminiError extends Error {
-  constructor(
-    message: string,
-    public readonly code:
-      | 'missing_key'
-      | 'auth'
-      | 'rate_limit'
-      | 'timeout'
-      | 'bad_response'
-      | 'blocked'
-      | 'model_not_found'
-      | 'truncated'
-      | 'upstream',
-  ) {
+  public readonly code: GeminiErrorCode;
+
+  constructor(message: string, code: GeminiErrorCode) {
     super(message);
     this.name = 'GeminiError';
+    this.code = code;
   }
 }
 
@@ -81,6 +87,64 @@ interface RawResult {
   status: number;
   data: GeminiResponse;
   detail: string;
+}
+
+/* ———————————————— إعادة المحاولة عند الازدحام المؤقت ————————————————
+ * Gemini يعيد أحيانًا 503 «The model is overloaded. Please try again
+ * later.» أو 500/502/504 بسبب ضغط مؤقت على خوادم Google، وهذه حالات
+ * عابرة تُحلّ عادة خلال ثوانٍ. بدل فشل الطلب فورًا ونزولنا إلى عرض
+ * المقاطع الخام بلا صياغة، نعيد المحاولة تلقائيًا عدّة مرّات مع تأخير
+ * متصاعد (exponential backoff) ضمن مهلة الطلب نفسها.
+ */
+
+const RETRYABLE_STATUS = new Set([500, 502, 503, 504]);
+const MAX_ATTEMPTS = 4;
+const RETRY_DELAYS_MS = [400, 1000, 2200];
+
+function isOverloadedMessage(detail: string): boolean {
+  return /overloaded|high demand|unavailable|try again later/i.test(detail);
+}
+
+function isRetryableResult(result: RawResult): boolean {
+  if (result.ok) return false;
+  // status === 0 يعني خطأ اتصال عابر (انظر callGemini).
+  return result.status === 0 || RETRYABLE_STATUS.has(result.status) || isOverloadedMessage(result.detail);
+}
+
+/** ينتظر `ms` أو يعود فورًا إن أُلغيت الإشارة أثناء الانتظار. */
+function delay(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal.aborted) return resolve();
+    const timer = setTimeout(resolve, ms);
+    signal.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
+      { once: true },
+    );
+  });
+}
+
+/** يستدعي Gemini مع إعادة محاولات تلقائية عند 503/ازدحام مؤقت. */
+async function callGeminiWithRetry(
+  key: string,
+  model: string,
+  body: Record<string, unknown>,
+  signal: AbortSignal,
+): Promise<RawResult> {
+  let result = await callGemini(key, model, body, signal);
+  let attempt = 1;
+
+  while (isRetryableResult(result) && attempt < MAX_ATTEMPTS && !signal.aborted) {
+    await delay(RETRY_DELAYS_MS[Math.min(attempt - 1, RETRY_DELAYS_MS.length - 1)], signal);
+    if (signal.aborted) break;
+    result = await callGemini(key, model, body, signal);
+    attempt += 1;
+  }
+
+  return result;
 }
 
 /* ———————————————— اكتشاف نموذج بديل تلقائيًا ————————————————
@@ -195,7 +259,9 @@ async function callGemini(
     if (name === 'TimeoutError' || name === 'AbortError') {
       throw new GeminiError('انتهت مهلة الاتصال بنموذج Gemini.', 'timeout');
     }
-    throw new GeminiError('تعذّر الاتصال بنموذج Gemini.', 'upstream');
+    // خطأ اتصال عابر (شبكة/DNS/إعادة تعيين): نرجعه كنتيجة لا كاستثناء كي
+    // تلتقطه حلقة إعادة المحاولة بدل إفشال الطلب من أول عثرة.
+    return { ok: false, status: 0, data: {}, detail: 'تعذّر الاتصال بنموذج Gemini.' };
   }
 
   let data: GeminiResponse = {};
@@ -232,21 +298,21 @@ export async function generateJson<T>(opts: GenerateOptions): Promise<T> {
   const signal = opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout;
 
   let model = activeModel(key);
-  let result = await callGemini(key, model, body, signal);
+  let result = await callGeminiWithRetry(key, model, body, signal);
 
   // النموذج المضبوط غير متاح لهذا المفتاح: نكتشف بديلًا متاحًا ونعيد المحاولة.
   if (!result.ok && result.status === 404) {
     const fallback = await discoverFallbackModel(key, signal);
     if (fallback && fallback !== model) {
       model = fallback;
-      result = await callGemini(key, model, body, signal);
+      result = await callGeminiWithRetry(key, model, body, signal);
     }
   }
 
   // بعض النماذج لا تقبل thinkingConfig: نعيد المحاولة مرة واحدة بدونه.
   if (!result.ok && result.status === 400 && isThinkingUnsupported(result.detail)) {
     delete (body.generationConfig as Record<string, unknown>).thinkingConfig;
-    result = await callGemini(key, model, body, signal);
+    result = await callGeminiWithRetry(key, model, body, signal);
   }
 
   const { ok, status, data, detail } = result;
@@ -264,6 +330,18 @@ export async function generateJson<T>(opts: GenerateOptions): Promise<T> {
     throw new GeminiError(
       `النموذج «${config.gemini.model}» غير متاح لهذا المفتاح، ولم يُعثر على أي نموذج بديل متاح له. تحقّق من المفتاح أو غيّر GEMINI_MODEL.`,
       'model_not_found',
+    );
+  }
+  if (!ok && status === 0) {
+    throw new GeminiError(
+      'تعذّر الاتصال بنموذج Gemini بعد عدّة محاولات تلقائية. تحقّق من الاتصال وحاول مرة أخرى.',
+      'upstream',
+    );
+  }
+  if (!ok && (RETRYABLE_STATUS.has(status) || isOverloadedMessage(detail))) {
+    throw new GeminiError(
+      'نموذج Gemini مزدحم حاليًا (ضغط مرتفع لدى Google). تمت إعادة المحاولة عدّة مرّات تلقائيًا دون نجاح، فحاول مرة أخرى خلال لحظات.',
+      'overloaded',
     );
   }
   if (!ok) {
