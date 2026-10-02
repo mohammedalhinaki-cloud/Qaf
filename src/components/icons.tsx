@@ -106,15 +106,6 @@ export const IconQuote = (p: P) => (
   </svg>
 );
 
-/** زر القائمة الإضافية (عن حُجَّة / المصادر / تواصل معنا) — ثلاث نقاط أفقية. */
-export const IconDots = (p: P) => (
-  <svg {...base} fill="currentColor" stroke="none" {...p}>
-    <circle cx="5" cy="12" r="1.9" />
-    <circle cx="12" cy="12" r="1.9" />
-    <circle cx="19" cy="12" r="1.9" />
-  </svg>
-);
-
 export const IconInfo = (p: P) => (
   <svg {...base} {...p}>
     <circle cx="12" cy="12" r="9" />

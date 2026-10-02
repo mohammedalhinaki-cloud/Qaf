@@ -1,82 +1,45 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { IconDots, IconInfo, IconLibrary, IconMail } from './icons';
+import { useState } from 'react';
+import { IconInfo, IconLibrary, IconMail } from './icons';
 import { InfoModal } from './InfoModal';
 
 type PanelId = 'about' | 'sources' | 'contact';
 
-const MENU_ITEMS: { id: PanelId; label: string; Icon: typeof IconInfo }[] = [
+/**
+ * عناصر «عن حُجَّة / المصادر / تواصل معنا».
+ * كانت سابقًا في قائمة (⋯) أعلى الصفحة، ونُقلت إلى أسفل القائمة الجانبية —
+ * فوق زر تبديل السمة مباشرة. لا تمس أي حالة من حالات المحادثة أو البحث.
+ */
+const INFO_ITEMS: { id: PanelId; label: string; Icon: typeof IconInfo }[] = [
   { id: 'about', label: 'عن حُجَّة', Icon: IconInfo },
   { id: 'sources', label: 'المصادر', Icon: IconLibrary },
   { id: 'contact', label: 'تواصل معنا', Icon: IconMail },
 ];
 
-/**
- * زر القائمة الإضافية (⋯) ولوحته المنسدلة، إلى جانب نوافذ المحتوى الثلاث.
- * لا يمس أي حالة من حالات المحادثة أو البحث — مستقل تمامًا عن ChatShell.
- */
-export function InfoMenu() {
-  const [open, setOpen] = useState(false);
+/** قائمة عمودية تُعرض داخل القائمة الجانبية، مع نوافذ المحتوى الثلاث. */
+export function InfoItems() {
   const [panel, setPanel] = useState<PanelId | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function onDocClick(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false);
-    }
-    document.addEventListener('mousedown', onDocClick);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDocClick);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
 
   return (
-    <div ref={rootRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="btn !px-2.5 !py-2"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label="قائمة المزيد"
-        title="المزيد"
-      >
-        <IconDots className="h-4 w-4" />
-      </button>
-
-      {open && (
-        <div
-          role="menu"
-          dir="rtl"
-          aria-label="قائمة المزيد"
-          className="menu-rise absolute right-0 top-[calc(100%+8px)] z-50 w-52 overflow-hidden
-                     rounded-2xl border border-ink-line bg-ink-panel py-1.5 shadow-lg"
-        >
-          {MENU_ITEMS.map(({ id, label, Icon }) => (
-            <button
-              key={id}
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                setPanel(id);
-              }}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-right text-[13.5px]
-                         text-ink-text transition-colors hover:bg-ink-line/40"
-            >
-              <Icon className="h-4 w-4 shrink-0 text-ink-accent/80" aria-hidden="true" />
-              <span>{label}</span>
-            </button>
+    <>
+      <nav aria-label="معلومات عن حُجَّة">
+        <ul className="space-y-1">
+          {INFO_ITEMS.map(({ id, label, Icon }) => (
+            <li key={id}>
+              <button
+                type="button"
+                onClick={() => setPanel(id)}
+                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-right
+                           text-[13.5px] text-ink-text transition-colors hover:bg-ink-line/40"
+              >
+                <Icon className="h-4 w-4 shrink-0 text-ink-accent/80" aria-hidden="true" />
+                <span>{label}</span>
+              </button>
+            </li>
           ))}
-        </div>
-      )}
+        </ul>
+      </nav>
 
       <InfoModal title="عن حُجَّة" open={panel === 'about'} onClose={() => setPanel(null)}>
         <AboutContent />
@@ -89,7 +52,7 @@ export function InfoMenu() {
       <InfoModal title="تواصل معنا" open={panel === 'contact'} onClose={() => setPanel(null)}>
         <ContactContent />
       </InfoModal>
-    </div>
+    </>
   );
 }
 

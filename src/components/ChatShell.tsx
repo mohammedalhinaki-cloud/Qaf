@@ -22,20 +22,23 @@ import {
 import { AnswerBlock } from './AnswerBlock';
 import { Composer } from './Composer';
 import { IconAlert, IconBook, IconMenu, IconQuote, IconSearch } from './icons';
-import { InfoMenu } from './InfoMenu';
 import { Logo, Wordmark } from './Logo';
 import { Sidebar } from './Sidebar';
 import { SourceStatusBar } from './SourceStatusBar';
 
 const MAX_CHARS = 500;
 
-/** أسئلة افتتاحية تظهر كشرائح أفقية فوق مربع الإدخال مباشرة. */
+/** أسئلة افتتاحية تظهر كشرائح في شاشة الترحيب. */
 const EXAMPLES: { q: string; Icon: ComponentType<SVGProps<SVGSVGElement>> }[] = [
   { q: 'ما حكم زكاة الذهب؟', Icon: IconBook },
   { q: 'ما الدليل على وجوب صلاة الجماعة؟', Icon: IconSearch },
   { q: 'ما حكم البيع بالتقسيط؟', Icon: IconBook },
   { q: 'ما قاله العلماء في مسألة رفع اليدين في الصلاة؟', Icon: IconQuote },
 ];
+
+/** إخلاء المسؤولية: تسمية توضيحية صغيرة مثبّتة أسفل مربع الإدخال مباشرة. */
+const LEGAL_NOTICE =
+  'حُجَّة أداة بحث وتوثيق، لا يُصدر فتوى ولا يرجّح بين الأقوال. راجع المصدر الأصلي في سياقه قبل الاعتماد عليه.';
 
 interface Live {
   stage: StageId | null;
@@ -224,159 +227,144 @@ export function ChatShell({ devFixtures = false }: { devFixtures?: boolean }) {
             ⚠️ وضع التطوير: نتائج «تراث» مقروءة من ملف محفوظ لا من الشبكة. هذا الوضع معطّل في الإنتاج.
           </div>
         )}
-        {/* شريط علوي للجوال */}
-        <header className="grid grid-cols-3 items-center gap-2 border-b border-ink-line px-3 py-2.5 md:hidden">
-          <div className="flex items-center justify-self-start gap-1.5">
-            <button
-              type="button"
-              onClick={() => setSidebarOpen(true)}
-              className="btn !px-2.5 !py-2"
-              aria-label="فتح قائمة المحادثات"
-            >
-              <IconMenu className="h-4 w-4" />
-            </button>
-            <InfoMenu />
+
+        {/* ——— ١) شريط علوي ثابت: زر القائمة (≡) + الشعار فقط ——— */}
+        <header
+          className="sticky top-0 z-20 flex shrink-0 items-center gap-2.5 border-b border-ink-line
+                     bg-ink-bg/90 px-3 py-2.5 backdrop-blur"
+        >
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(true)}
+            className="btn !px-2.5 !py-2"
+            aria-label="فتح القائمة الجانبية"
+            title="القائمة"
+          >
+            <IconMenu className="h-5 w-5" />
+          </button>
+          <div className="flex items-center gap-2">
+            <Logo size={24} />
+            <Wordmark className="text-[15px]" />
           </div>
-          <div className="flex items-center justify-center gap-2">
-            <Logo size={22} />
-            <Wordmark className="text-sm" />
-          </div>
-          <div aria-hidden="true" />
         </header>
 
-        {/* شريط علوي للشاشات الأوسع: قائمة «المزيد» فقط */}
-        <div className="hidden items-center justify-start border-b border-ink-line px-4 py-2 md:flex">
-          <InfoMenu />
-        </div>
-
+        {/* ——— ٢) المنطقة الوسطى القابلة للتمرير: سجل المحادثة أو شاشة الترحيب ——— */}
         {isEmpty ? (
-          /* ——— الشاشة الأولى ——— */
-          <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-8">
-            <div className="w-full max-w-2xl">
-              <div className="mb-8 text-center">
-                <div className="mb-4 flex justify-center">
-                  <Logo size={56} />
+          <div className="flex-1 overflow-y-auto">
+            <div className="flex min-h-full flex-col items-center justify-center px-4 py-8">
+              <div className="w-full max-w-2xl">
+                <div className="mb-8 text-center">
+                  <div className="mb-4 flex justify-center">
+                    <Logo size={56} />
+                  </div>
+                  <h1 className="text-3xl">
+                    <Wordmark />
+                  </h1>
+                  <p className="mx-auto mt-2 max-w-lg text-[12.5px] leading-6 text-ink-muted">
+                    الذكاء الاصطناعي للتحقق العلمي والبحث في المراجع الإسلامية
+                  </p>
                 </div>
-                <h1 className="text-3xl">
-                  <Wordmark />
-                </h1>
-                <p className="mx-auto mt-2 max-w-lg text-[12.5px] leading-6 text-ink-muted">
-                  الذكاء الاصطناعي للتحقق العلمي والبحث في المراجع الإسلامية
-                </p>
+
+                {/* أسئلة افتتاحية */}
+                <div
+                  className="flex flex-wrap items-center justify-center gap-2"
+                  role="group"
+                  aria-label="أسئلة مقترحة"
+                >
+                  {EXAMPLES.map(({ q, Icon }) => (
+                    <button key={q} type="button" onClick={() => setInput(q)} className="suggest-chip">
+                      <Icon className="h-3.5 w-3.5 shrink-0 text-ink-accent/75" aria-hidden="true" />
+                      <span>{q}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
-
-              {/* أسئلة افتتاحية: شريط شرائح أفقي فوق مربع الإدخال مباشرة */}
-              <div
-                className="suggest-row mb-2.5 flex items-center gap-2 pb-1"
-                role="group"
-                aria-label="أسئلة مقترحة"
-              >
-                {EXAMPLES.map(({ q, Icon }) => (
-                  <button key={q} type="button" onClick={() => setInput(q)} className="suggest-chip">
-                    <Icon className="h-3.5 w-3.5 shrink-0 text-ink-accent/75" aria-hidden="true" />
-                    <span>{q}</span>
-                  </button>
-                ))}
-              </div>
-
-              <Composer
-                value={input}
-                onChange={setInput}
-                madhhab={madhhab}
-                onMadhhabChange={setMadhhab}
-                onSubmit={() => void send(input)}
-                busy={busy}
-                maxChars={MAX_CHARS}
-              />
-
-              <p className="mt-8 text-center text-[11px] leading-6 text-ink-muted">
-                حُجَّة أداة بحث وتوثيق، لا يُصدر فتوى ولا يرجّح بين الأقوال. راجع المصدر الأصلي في سياقه قبل
-                الاعتماد عليه.
-              </p>
             </div>
           </div>
         ) : (
-          /* ——— المحادثة ——— */
-          <>
-            <div className="flex-1 overflow-y-auto">
-              <div className="mx-auto w-full max-w-3xl space-y-8 px-4 py-6">
-                {messages.map((m) =>
-                  m.role === 'user' ? (
-                    <div key={m.id} className="flex justify-start">
-                      <div className="max-w-[88%] rounded-2xl rounded-tr-md bg-ink-accent/10 px-4 py-3">
-                        <p className="prose-ar text-[15px] font-medium">{m.content}</p>
-                        {m.madhhab && m.madhhab !== 'all' && (
-                          <p className="mt-1.5 text-[11px] text-ink-muted">
-                            فلتر المذهب مُفعّل في هذا السؤال
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <div key={m.id}>
-                      {m.result ? (
-                        <AnswerBlock result={m.result} />
-                      ) : (
-                        <div
-                          className="flex gap-2.5 rounded-xl border border-red-500/30 bg-red-500/[0.06] p-3.5
-                                     text-[13px] leading-6 text-red-700 dark:text-red-300"
-                          role="alert"
-                        >
-                          <IconAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                          <p>{m.error}</p>
-                        </div>
+          <div className="flex-1 overflow-y-auto">
+            <div className="mx-auto w-full max-w-3xl space-y-8 px-4 py-6">
+              {messages.map((m) =>
+                m.role === 'user' ? (
+                  <div key={m.id} className="flex justify-start">
+                    <div className="max-w-[88%] rounded-2xl rounded-tr-md bg-ink-accent/10 px-4 py-3">
+                      <p className="prose-ar text-[15px] font-medium">{m.content}</p>
+                      {m.madhhab && m.madhhab !== 'all' && (
+                        <p className="mt-1.5 text-[11px] text-ink-muted">
+                          فلتر المذهب مُفعّل في هذا السؤال
+                        </p>
                       )}
                     </div>
-                  ),
-                )}
-
-                {busy && (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-[13px] text-ink-muted">
-                      <span className="flex gap-1" aria-hidden="true">
-                        <span className="dot-pulse h-1.5 w-1.5 rounded-full bg-ink-accent" />
-                        <span
-                          className="dot-pulse h-1.5 w-1.5 rounded-full bg-ink-accent"
-                          style={{ animationDelay: '0.2s' }}
-                        />
-                        <span
-                          className="dot-pulse h-1.5 w-1.5 rounded-full bg-ink-accent"
-                          style={{ animationDelay: '0.4s' }}
-                        />
-                      </span>
-                      <span>{live.stage ? STAGE_LABEL[live.stage] : 'جارٍ العمل…'}</span>
-                    </div>
-                    <SourceStatusBar
-                      statuses={live.statuses}
-                      stage={live.stage ?? undefined}
-                      queries={live.queries}
-                    />
                   </div>
-                )}
+                ) : (
+                  <div key={m.id}>
+                    {m.result ? (
+                      <AnswerBlock result={m.result} />
+                    ) : (
+                      <div
+                        className="flex gap-2.5 rounded-xl border border-red-500/30 bg-red-500/[0.06] p-3.5
+                                     text-[13px] leading-6 text-red-700 dark:text-red-300"
+                        role="alert"
+                      >
+                        <IconAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                        <p>{m.error}</p>
+                      </div>
+                    )}
+                  </div>
+                ),
+              )}
 
-                <div ref={bottomRef} />
-              </div>
-            </div>
+              {busy && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-[13px] text-ink-muted">
+                    <span className="flex gap-1" aria-hidden="true">
+                      <span className="dot-pulse h-1.5 w-1.5 rounded-full bg-ink-accent" />
+                      <span
+                        className="dot-pulse h-1.5 w-1.5 rounded-full bg-ink-accent"
+                        style={{ animationDelay: '0.2s' }}
+                      />
+                      <span
+                        className="dot-pulse h-1.5 w-1.5 rounded-full bg-ink-accent"
+                        style={{ animationDelay: '0.4s' }}
+                      />
+                    </span>
+                    <span>{live.stage ? STAGE_LABEL[live.stage] : 'جارٍ العمل…'}</span>
+                  </div>
+                  <SourceStatusBar
+                    statuses={live.statuses}
+                    stage={live.stage ?? undefined}
+                    queries={live.queries}
+                  />
+                </div>
+              )}
 
-            <div className="border-t border-ink-line bg-ink-bg/90 px-4 py-3 backdrop-blur">
-              <div className="mx-auto w-full max-w-3xl">
-                <Composer
-                  value={input}
-                  onChange={setInput}
-                  madhhab={madhhab}
-                  onMadhhabChange={setMadhhab}
-                  onSubmit={() => void send(input)}
-                  busy={busy}
-                  maxChars={MAX_CHARS}
-                  compact
-                />
-                <p className="mt-2 text-center text-[10.5px] text-ink-muted">
-                  الإجابات مبنية على مقاطع مسترجَعة من مكتبة تراث. راجع المصدر الأصلي قبل الاعتماد.
-                </p>
-              </div>
+              <div ref={bottomRef} />
             </div>
-          </>
+          </div>
         )}
+
+        {/* ——— ٣) شريط الإدخال السفلي المثبّت + إخلاء المسؤولية أسفله ——— */}
+        <div
+          className="sticky bottom-0 z-20 shrink-0 border-t border-ink-line bg-ink-bg/95
+                     px-4 pt-3 backdrop-blur"
+        >
+          <div className={`mx-auto w-full ${isEmpty ? 'max-w-2xl' : 'max-w-3xl'}`}>
+            <Composer
+              value={input}
+              onChange={setInput}
+              madhhab={madhhab}
+              onMadhhabChange={setMadhhab}
+              onSubmit={() => void send(input)}
+              busy={busy}
+              maxChars={MAX_CHARS}
+              compact
+            />
+
+            <p className="px-2 pb-2.5 pt-2 text-center text-[10.5px] leading-5 text-ink-muted">
+              {LEGAL_NOTICE}
+            </p>
+          </div>
+        </div>
       </main>
     </div>
   );

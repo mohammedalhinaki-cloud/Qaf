@@ -95,24 +95,6 @@
            text-xs text-ink-muted;
   }
 
-  /* شريط الأسئلة الافتتاحية: صف أفقي قابل للتمرير فوق مربع الإدخال مباشرة */
-  .suggest-row {
-    overflow-x: auto;
-    overflow-y: hidden;
-    overscroll-behavior-x: contain;
-    scroll-snap-type: x proximity;
-    -webkit-overflow-scrolling: touch;
-    touch-action: pan-x;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-
-  .suggest-row::-webkit-scrollbar {
-    display: none;
-    width: 0;
-    height: 0;
-  }
-
   .suggest-chip {
     @apply inline-flex shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-full
            border border-ink-line bg-ink-panel px-3.5 py-1.5 text-[12.5px] leading-6 text-ink-muted
@@ -199,23 +181,6 @@
   from {
     opacity: 0;
     transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-/* قائمة «⋯» المنسدلة */
-.menu-rise {
-  animation: hujjah-menu-rise 0.14s ease-out both;
-  transform-origin: top right;
-}
-
-@keyframes hujjah-menu-rise {
-  from {
-    opacity: 0;
-    transform: scale(0.96) translateY(-4px);
   }
   to {
     opacity: 1;
