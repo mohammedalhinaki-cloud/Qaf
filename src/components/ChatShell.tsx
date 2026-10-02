@@ -22,6 +22,7 @@ import {
 import { AnswerBlock } from './AnswerBlock';
 import { Composer } from './Composer';
 import { IconAlert, IconBook, IconMenu, IconQuote, IconSearch } from './icons';
+import { InfoMenu } from './InfoMenu';
 import { Logo, Wordmark } from './Logo';
 import { Sidebar } from './Sidebar';
 import { SourceStatusBar } from './SourceStatusBar';
@@ -224,21 +225,29 @@ export function ChatShell({ devFixtures = false }: { devFixtures?: boolean }) {
           </div>
         )}
         {/* شريط علوي للجوال */}
-        <header className="flex items-center justify-between gap-2 border-b border-ink-line px-3 py-2.5 md:hidden">
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(true)}
-            className="btn !px-2.5 !py-2"
-            aria-label="فتح قائمة المحادثات"
-          >
-            <IconMenu className="h-4 w-4" />
-          </button>
-          <div className="flex items-center gap-2">
+        <header className="grid grid-cols-3 items-center gap-2 border-b border-ink-line px-3 py-2.5 md:hidden">
+          <div className="flex items-center justify-self-start gap-1.5">
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              className="btn !px-2.5 !py-2"
+              aria-label="فتح قائمة المحادثات"
+            >
+              <IconMenu className="h-4 w-4" />
+            </button>
+            <InfoMenu />
+          </div>
+          <div className="flex items-center justify-center gap-2">
             <Logo size={22} />
             <Wordmark className="text-sm" />
           </div>
-          <div className="w-9" aria-hidden="true" />
+          <div aria-hidden="true" />
         </header>
+
+        {/* شريط علوي للشاشات الأوسع: قائمة «المزيد» فقط */}
+        <div className="hidden items-center justify-start border-b border-ink-line px-4 py-2 md:flex">
+          <InfoMenu />
+        </div>
 
         {isEmpty ? (
           /* ——— الشاشة الأولى ——— */
@@ -253,11 +262,6 @@ export function ChatShell({ devFixtures = false }: { devFixtures?: boolean }) {
                 </h1>
                 <p className="mx-auto mt-2 max-w-lg text-[12.5px] leading-6 text-ink-muted">
                   الذكاء الاصطناعي للتحقق العلمي والبحث في المراجع الإسلامية
-                </p>
-                <p className="mx-auto mt-3 max-w-md text-[13.5px] leading-7 text-ink-muted">
-                  يبحث حُجَّة في المراجع الإسلامية عبر{' '}
-                  <strong className="font-semibold text-ink-text">تراث</strong>، ثم يعرض الإجابة مع
-                  أدلتها ومصادرها الأصلية للتحقق منها.
                 </p>
               </div>
 

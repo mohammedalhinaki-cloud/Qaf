@@ -105,3 +105,40 @@ export const IconQuote = (p: P) => (
     <path d="M9 7H5a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h2v1a3 3 0 0 1-3 3M19 7h-4a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h2v1a3 3 0 0 1-3 3" />
   </svg>
 );
+
+/** زر القائمة الإضافية (عن حُجَّة / المصادر / تواصل معنا) — ثلاث نقاط أفقية. */
+export const IconDots = (p: P) => (
+  <svg {...base} fill="currentColor" stroke="none" {...p}>
+    <circle cx="5" cy="12" r="1.9" />
+    <circle cx="12" cy="12" r="1.9" />
+    <circle cx="19" cy="12" r="1.9" />
+  </svg>
+);
+
+export const IconInfo = (p: P) => (
+  <svg {...base} {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 11v5.5M12 7.5v.01" />
+  </svg>
+);
+
+export const IconLibrary = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M4 19V5a1 1 0 0 1 1-1h3v16H5a1 1 0 0 1-1-1z" />
+    <path d="M10 20V4h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1z" />
+    <path d="M16.3 4.3 19 5.2a1 1 0 0 1 .67 1.24L16.9 19.9" />
+  </svg>
+);
+
+export const IconMail = (p: P) => (
+  <svg {...base} {...p}>
+    <rect x="3" y="5" width="18" height="14" rx="2.2" />
+    <path d="m4 7 8 6 8-6" />
+  </svg>
+);
+
+export const IconChevronLeft = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="m14.5 6-6 6 6 6" />
+  </svg>
+);

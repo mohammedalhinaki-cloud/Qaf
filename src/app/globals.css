@@ -206,6 +206,56 @@
   }
 }
 
+/* قائمة «⋯» المنسدلة */
+.menu-rise {
+  animation: hujjah-menu-rise 0.14s ease-out both;
+  transform-origin: top right;
+}
+
+@keyframes hujjah-menu-rise {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* نوافذ المعلومات (عن حُجَّة / المصادر / تواصل معنا) */
+.modal-rise {
+  animation: hujjah-modal-rise 0.18s ease-out both;
+}
+
+@keyframes hujjah-modal-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (min-width: 640px) {
+  .modal-rise {
+    animation-name: hujjah-modal-pop;
+  }
+}
+
+@keyframes hujjah-modal-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
