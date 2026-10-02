@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ComponentType, SVGProps } from 'react';
 import { askStream } from '@/lib/chat/askClient';
 import {
   createConversation,
@@ -20,17 +21,19 @@ import {
 } from '@/lib/types';
 import { AnswerBlock } from './AnswerBlock';
 import { Composer } from './Composer';
-import { IconAlert, IconMenu } from './icons';
+import { IconAlert, IconBook, IconMenu, IconQuote, IconSearch } from './icons';
 import { Logo, Wordmark } from './Logo';
 import { Sidebar } from './Sidebar';
 import { SourceStatusBar } from './SourceStatusBar';
 
 const MAX_CHARS = 500;
 
-const EXAMPLES = [
-  'ما حكم النية في الوضوء عند الفقهاء؟',
-  'تخريج حديث «إنما الأعمال بالنيات»',
-  'مسألة قراءة الفاتحة خلف الإمام',
+/** أسئلة افتتاحية تظهر كشرائح أفقية فوق مربع الإدخال مباشرة. */
+const EXAMPLES: { q: string; Icon: ComponentType<SVGProps<SVGSVGElement>> }[] = [
+  { q: 'ما حكم زكاة الذهب؟', Icon: IconBook },
+  { q: 'ما الدليل على وجوب صلاة الجماعة؟', Icon: IconSearch },
+  { q: 'ما حكم البيع بالتقسيط؟', Icon: IconBook },
+  { q: 'ما قاله العلماء في مسألة رفع اليدين في الصلاة؟', Icon: IconQuote },
 ];
 
 interface Live {
@@ -258,6 +261,20 @@ export function ChatShell({ devFixtures = false }: { devFixtures?: boolean }) {
                 </p>
               </div>
 
+              {/* أسئلة افتتاحية: شريط شرائح أفقي فوق مربع الإدخال مباشرة */}
+              <div
+                className="suggest-row mb-2.5 flex items-center gap-2 pb-1"
+                role="group"
+                aria-label="أسئلة مقترحة"
+              >
+                {EXAMPLES.map(({ q, Icon }) => (
+                  <button key={q} type="button" onClick={() => setInput(q)} className="suggest-chip">
+                    <Icon className="h-3.5 w-3.5 shrink-0 text-ink-accent/75" aria-hidden="true" />
+                    <span>{q}</span>
+                  </button>
+                ))}
+              </div>
+
               <Composer
                 value={input}
                 onChange={setInput}
@@ -267,19 +284,6 @@ export function ChatShell({ devFixtures = false }: { devFixtures?: boolean }) {
                 busy={busy}
                 maxChars={MAX_CHARS}
               />
-
-              <div className="mt-5 flex flex-wrap justify-center gap-2">
-                {EXAMPLES.map((ex) => (
-                  <button
-                    key={ex}
-                    type="button"
-                    onClick={() => setInput(ex)}
-                    className="chip transition-colors hover:border-ink-accent/40 hover:text-ink-accent"
-                  >
-                    {ex}
-                  </button>
-                ))}
-              </div>
 
               <p className="mt-8 text-center text-[11px] leading-6 text-ink-muted">
                 حُجَّة أداة بحث وتوثيق، لا يُصدر فتوى ولا يرجّح بين الأقوال. راجع المصدر الأصلي في سياقه قبل

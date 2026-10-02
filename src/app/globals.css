@@ -94,6 +94,61 @@
     @apply inline-flex items-center gap-1.5 rounded-lg border border-ink-line px-2.5 py-1
            text-xs text-ink-muted;
   }
+
+  /* شريط الأسئلة الافتتاحية: صف أفقي قابل للتمرير فوق مربع الإدخال مباشرة */
+  .suggest-row {
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .suggest-row::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  .suggest-chip {
+    @apply inline-flex shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-full
+           border border-ink-line bg-ink-panel px-3.5 py-1.5 text-[12.5px] leading-6 text-ink-muted
+           transition-colors hover:border-ink-accent/40 hover:bg-ink-accent/[0.06]
+           hover:text-ink-accent active:bg-ink-accent/10;
+  }
+
+  /* زر الإملاء الصوتي: ميكروفون ↔ مربع إيقاف (الزر نفسه) */
+  .mic-btn {
+    @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border
+           border-ink-line text-ink-muted transition-colors duration-150 hover:bg-ink-line/40
+           hover:text-ink-text disabled:cursor-not-allowed disabled:opacity-45;
+  }
+
+  .mic-btn-rec {
+    @apply border-transparent bg-ink-accent text-white hover:bg-ink-accent hover:text-white;
+    animation: hujjah-mic-ring 1.8s ease-out infinite;
+  }
+
+  /* موجات صوتية تعكس مستوى الاستماع أثناء التسجيل */
+  .wave {
+    --wave-level: 0.14;
+    @apply flex h-5 shrink-0 items-center gap-[3px];
+  }
+
+  .wave-bar {
+    width: 3px;
+    height: calc(4px + 16px * var(--wave-level));
+    border-radius: 9999px;
+    background-color: rgb(var(--c-accent));
+    animation: hujjah-wave 1s ease-in-out infinite;
+  }
+
+  .rec-row {
+    animation: hujjah-rise 0.18s ease-out both;
+  }
 }
 
 /* الشعار النصي «حُجَّة»: تباعد خفيف وضبط ارتفاع السطر حتى لا يُقصّ التشكيل. */
@@ -116,6 +171,39 @@
 
 .dot-pulse {
   animation: hujjah-pulse 1.3s ease-in-out infinite;
+}
+
+@keyframes hujjah-wave {
+  0%,
+  100% {
+    transform: scaleY(0.45);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes hujjah-mic-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgb(var(--c-accent) / 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 9px rgb(var(--c-accent) / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgb(var(--c-accent) / 0);
+  }
+}
+
+@keyframes hujjah-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
