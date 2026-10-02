@@ -1,7 +1,9 @@
 'use client';
 
+import { useEffect } from 'react';
 import type { Conversation } from '@/lib/types';
 import { IconClose, IconPlus, IconTrash } from './icons';
+import { InfoItems } from './InfoItems';
 import { Logo, Wordmark } from './Logo';
 import { ThemeToggle } from './ThemeToggle';
 
@@ -27,25 +29,41 @@ function relativeTime(ts: number): string {
   return new Date(ts).toLocaleDateString('ar', { day: 'numeric', month: 'short' });
 }
 
+/**
+ * القائمة الجانبية: درج عائم يغطي المحتوى بالكامل على كل المقاسات (نمط ChatGPT/Gemini)،
+ * يُفتح من زر (≡) في الشريط العلوي ويُغلق بالنقر خارجَه أو بزر الإغلاق أو بمفتاح الهروب.
+ */
 export function Sidebar({ conversations, activeId, open, onClose, onNew, onSelect, onDelete }: Props) {
+  /* إغلاق الدرج بمفتاح الهروب */
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
   return (
     <>
+      {/* حاجب خلفي يغطي الصفحة كاملة ويمنع ظهور المحتوى خلف الدرج */}
       {open && (
         <div
-          className="fixed inset-0 z-30 bg-black/40 md:hidden"
+          className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[1px]"
           onClick={onClose}
           aria-hidden="true"
         />
       )}
 
       <aside
-        className={`fixed inset-y-0 right-0 z-40 flex w-[82%] max-w-[300px] flex-col border-l
-                    border-ink-line bg-ink-panel transition-transform duration-200
-                    md:static md:w-[272px] md:translate-x-0
-                    ${open ? 'translate-x-0' : 'translate-x-full'}`}
-        aria-label="المحادثات"
+        className={`fixed inset-y-0 right-0 z-50 flex h-full min-h-screen w-[86%] max-w-[320px]
+                    flex-col border-l border-ink-line bg-ink-panel shadow-2xl
+                    transition-[transform,visibility] duration-200
+                    ${open ? 'visible translate-x-0' : 'invisible translate-x-full'}`}
+        aria-label="قائمة حُجَّة"
       >
-        <div className="flex items-center justify-between gap-2 border-b border-ink-line px-4 py-3.5">
+        {/* رأس الدرج: الشعار + زر الإغلاق */}
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-ink-line px-4 py-3.5">
           <div className="flex items-center gap-2.5">
             <Logo size={26} />
             <div className="leading-tight">
@@ -53,19 +71,20 @@ export function Sidebar({ conversations, activeId, open, onClose, onNew, onSelec
               <div className="text-[11px] text-ink-muted">تحقّق علمي من المراجع</div>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="btn !px-2 !py-1.5 md:hidden" aria-label="إغلاق القائمة">
+          <button type="button" onClick={onClose} className="btn !px-2 !py-1.5" aria-label="إغلاق القائمة">
             <IconClose className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="p-3">
+        <div className="shrink-0 p-3">
           <button type="button" onClick={onNew} className="btn w-full">
             <IconPlus className="h-4 w-4" />
             محادثة جديدة
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-2 pb-2">
+        {/* سجل المحادثات */}
+        <nav className="flex-1 overflow-y-auto px-2 pb-2" aria-label="سجل المحادثات">
           {conversations.length === 0 ? (
             <p className="px-3 py-6 text-center text-xs leading-6 text-ink-muted">
               لا توجد محادثات بعد.
@@ -114,9 +133,14 @@ export function Sidebar({ conversations, activeId, open, onClose, onNew, onSelec
           )}
         </nav>
 
-        <div className="flex items-center justify-between gap-2 border-t border-ink-line px-3 py-3">
-          <p className="text-[11px] leading-5 text-ink-muted">المصدر: مكتبة تراث</p>
-          <ThemeToggle />
+        {/* أسفل الدرج: عناصر المعلومات فوق زر تبديل السمة مباشرة */}
+        <div className="shrink-0 border-t border-ink-line p-3">
+          <InfoItems />
+
+          <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-ink-line pt-2.5">
+            <p className="text-[11px] leading-5 text-ink-muted">المصدر: مكتبة تراث</p>
+            <ThemeToggle />
+          </div>
         </div>
       </aside>
     </>
