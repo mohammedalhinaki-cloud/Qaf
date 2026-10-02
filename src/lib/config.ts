@@ -54,7 +54,7 @@ export const config = {
     /** أقصى عدد رسائل سياق سابقة تُرسل للنموذج */
     maxHistoryTurns: 4,
   },
-  userAgent: 'Maoun/0.1 (+research assistant; contact via repository)',
+  userAgent: 'Hujjah/0.1 (+research assistant; contact via repository)',
 } as const;
 
 export type AppConfig = typeof config;

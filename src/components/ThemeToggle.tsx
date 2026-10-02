@@ -17,7 +17,7 @@ export function ThemeToggle() {
     setDark(next);
     document.documentElement.classList.toggle('dark', next);
     try {
-      localStorage.setItem('maoun.theme', next ? 'dark' : 'light');
+      localStorage.setItem('hujjah.theme', next ? 'dark' : 'light');
     } catch {
       /* تجاهل */
     }

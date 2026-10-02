@@ -49,11 +49,11 @@ export function Composer({
 
   return (
     <div className="card overflow-hidden shadow-sm">
-      <label htmlFor="maoun-q" className="sr-only">
+      <label htmlFor="hujjah-q" className="sr-only">
         اكتب سؤالك
       </label>
       <textarea
-        id="maoun-q"
+        id="hujjah-q"
         ref={ref}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -62,18 +62,18 @@ export function Composer({
         rows={compact ? 1 : 2}
         dir="rtl"
         disabled={busy}
-        aria-describedby="maoun-q-help"
+        aria-describedby="hujjah-q-help"
         className="w-full resize-none bg-transparent px-4 pt-3.5 text-[15px] leading-8
                    placeholder:text-ink-muted/70 focus:outline-none disabled:opacity-60"
       />
 
       <div className="flex flex-wrap items-center justify-between gap-2 px-3 pb-3 pt-1">
         <div className="flex items-center gap-2">
-          <label htmlFor="maoun-madhhab" className="text-xs text-ink-muted">
+          <label htmlFor="hujjah-madhhab" className="text-xs text-ink-muted">
             المذهب:
           </label>
           <select
-            id="maoun-madhhab"
+            id="hujjah-madhhab"
             value={madhhab}
             onChange={(e) => onMadhhabChange(e.target.value as Madhhab)}
             disabled={busy}
@@ -90,7 +90,7 @@ export function Composer({
 
         <div className="flex items-center gap-3">
           <span
-            id="maoun-q-help"
+            id="hujjah-q-help"
             className={`text-[11px] tabular-nums ${tooLong ? 'font-semibold text-red-500' : 'text-ink-muted'}`}
           >
             {value.length} / {maxChars}

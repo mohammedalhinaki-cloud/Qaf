@@ -8,13 +8,15 @@
  *   https://api.turath.io/search?q=النية%20في%20الوضوء&ver=3
  * ولم يُعدَّل فيها اسم كتاب ولا مؤلف ولا جزء ولا صفحة ولا نص.
  *
- * التفعيل: NODE_ENV !== 'production' و MAOUN_DEV_FIXTURES=true معًا.
+ * التفعيل: NODE_ENV !== 'production' و HUJJAH_DEV_FIXTURES=true معًا.
+ * (يُقبل الاسم السابق MAOUN_DEV_FIXTURES للتوافق مع البيئات المحلية القديمة.)
  * عند التفعيل تُعلَم كل استجابة في الواجهة بشريط «وضع التطوير» الظاهر،
  * ولا يمكن للمستخدم النهائي في الإنتاج رؤية هذه البيانات بأي حال.
  */
 
 export function devFixturesEnabled(): boolean {
-  return process.env.NODE_ENV !== 'production' && process.env.MAOUN_DEV_FIXTURES === 'true';
+  const flag = process.env.HUJJAH_DEV_FIXTURES ?? process.env.MAOUN_DEV_FIXTURES;
+  return process.env.NODE_ENV !== 'production' && flag === 'true';
 }
 
 /** نفس شكل استجابة GET /search في تراث. */

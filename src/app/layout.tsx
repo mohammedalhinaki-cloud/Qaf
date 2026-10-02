@@ -1,12 +1,41 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
+const SITE_URL = 'https://hujjah.maaoun.com';
+const SITE_NAME = 'حُجَّة';
+const SITE_TAGLINE = 'حُجَّة — الذكاء الاصطناعي للتحقق العلمي والبحث في المراجع الإسلامية الصحيحة';
+const SITE_DESCRIPTION =
+  'باحث ذكي يبحث في المراجع الإسلامية، ويعرض الإجابة مع مصادرها الأصلية للتحقق منها.';
+
 export const metadata: Metadata = {
-  title: 'ماعون — بحث موثّق في المكتبة الشاملة وتراث',
-  description:
-    'مساعد بحثي يبحث في المكتبة الشاملة وتراث، ويصوغ إجابة مستندة إلى المقاطع المسترجَعة مع عرض الأدلة وروابط المصادر الأصلية.',
-  applicationName: 'ماعون',
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: SITE_TAGLINE,
+    template: `%s — ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  manifest: '/manifest.webmanifest',
   robots: { index: true, follow: true },
+  alternates: { canonical: '/' },
+  openGraph: {
+    type: 'website',
+    locale: 'ar',
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    title: SITE_TAGLINE,
+    description: SITE_DESCRIPTION,
+  },
+  twitter: {
+    card: 'summary',
+    title: SITE_TAGLINE,
+    description: SITE_DESCRIPTION,
+  },
+  appleWebApp: {
+    capable: true,
+    title: SITE_NAME,
+    statusBarStyle: 'default',
+  },
 };
 
 export const viewport: Viewport = {
@@ -19,7 +48,7 @@ export const viewport: Viewport = {
 };
 
 /** يضبط السمة قبل أول رسم لتفادي ومضة التبديل. */
-const themeScript = `(function(){try{var t=localStorage.getItem('maoun.theme');var d=t?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;if(d)document.documentElement.classList.add('dark');}catch(e){}})();`;
+const themeScript = `(function(){try{var t=localStorage.getItem('hujjah.theme')||localStorage.getItem('maoun.theme');var d=t?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;if(d)document.documentElement.classList.add('dark');}catch(e){}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
