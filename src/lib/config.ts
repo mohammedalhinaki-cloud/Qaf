@@ -8,7 +8,7 @@
 
 import { envBool, envInt, envString, resolveGeminiKey } from '@/lib/env';
 
-export const DEFAULT_GEMINI_MODEL = 'gemini-2.0-flash';
+export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 export const DEFAULT_GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 
 /**
