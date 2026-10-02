@@ -87,6 +87,19 @@ export const IconSearch = (p: P) => (
   </svg>
 );
 
+export const IconMic = (p: P) => (
+  <svg {...base} {...p}>
+    <rect x="9" y="2.5" width="6" height="11" rx="3" />
+    <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
+  </svg>
+);
+
+export const IconStop = (p: P) => (
+  <svg {...base} fill="currentColor" stroke="none" {...p}>
+    <rect x="7" y="7" width="10" height="10" rx="2.4" />
+  </svg>
+);
+
 export const IconQuote = (p: P) => (
   <svg {...base} {...p}>
     <path d="M9 7H5a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h2v1a3 3 0 0 1-3 3M19 7h-4a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h2v1a3 3 0 0 1-3 3" />
