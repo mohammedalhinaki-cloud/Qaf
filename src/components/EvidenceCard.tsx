@@ -2,8 +2,14 @@
 
 import { useState } from 'react';
 import { MADHHAB_BASIS_LABEL } from '@/lib/search/madhhab';
-import { MADHHAB_LABEL, SOURCE_LABEL, type Evidence } from '@/lib/types';
+import { MADHHAB_LABEL, type Evidence } from '@/lib/types';
 import { IconBook, IconExternal, IconQuote } from './icons';
+
+/**
+ * بطاقة دليل كاملة: تُعرض فقط عندما لا توجد إجابة نصية
+ * (المادة غير كافية أو تعذّرت الصياغة)، لأن الاستشهادات
+ * داخل نص الإجابة تحمل بيانات المصدر عند الضغط عليها.
+ */
 
 /** بيانات الموضع — تُعرض فقط عند توفّرها من المصدر. */
 function Locus({ ev }: { ev: Evidence }) {
@@ -14,23 +20,9 @@ function Locus({ ev }: { ev: Evidence }) {
   return <span>{bits.join(' · ')}</span>;
 }
 
-function SourceBadge({ ev }: { ev: Evidence }) {
-  return (
-    <span
-      className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${
-        ev.source === 'shamela'
-          ? 'bg-sky-500/12 text-sky-700 dark:text-sky-300'
-          : 'bg-violet-500/12 text-violet-700 dark:text-violet-300'
-      }`}
-    >
-      {SOURCE_LABEL[ev.source]}
-    </span>
-  );
-}
-
 const CLAMP = 460;
 
-/** بطاقة دليل: النص المستند إليه + بيانات التوثيق + رابط المصدر الأصلي. */
+/** بطاقة دليل: النص المستند إليه + بيانات التوثيق + رابط المصدر الأصلي في تراث. */
 export function EvidenceCard({ ev }: { ev: Evidence }) {
   const [expanded, setExpanded] = useState(false);
   const long = ev.text.length > CLAMP;
@@ -42,7 +34,6 @@ export function EvidenceCard({ ev }: { ev: Evidence }) {
         <span className="rounded-md bg-ink-accent/12 px-1.5 py-0.5 text-[10px] font-bold text-ink-accent">
           {ev.id}
         </span>
-        <SourceBadge ev={ev} />
         {ev.madhhabMatch && (
           <span
             className="chip !border-ink-accent/35 !text-ink-accent"
@@ -103,34 +94,5 @@ export function EvidenceCard({ ev }: { ev: Evidence }) {
         </a>
       </footer>
     </article>
-  );
-}
-
-/** بطاقة مصدر مختصرة لقسم «المصادر». */
-export function SourceCard({ ev }: { ev: Evidence }) {
-  return (
-    <li className="card flex items-center justify-between gap-3 p-3.5">
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[13px] font-semibold">📖 {ev.bookTitle}</span>
-          <SourceBadge ev={ev} />
-        </div>
-        <div className="mt-0.5 text-[12px] leading-6 text-ink-muted">
-          {ev.author ? `المؤلف: ${ev.author}` : 'المؤلف: غير مذكور في بيانات المصدر'}
-          {ev.volume ? ` · الجزء: ${ev.volume}` : ''}
-          {ev.page !== undefined ? ` · الصفحة: ${ev.page}` : ''}
-        </div>
-      </div>
-      <a
-        href={ev.url}
-        target="_blank"
-        rel="noopener noreferrer nofollow"
-        className="btn shrink-0 !py-1.5 !text-xs"
-        aria-label={`فتح المصدر الأصلي: ${ev.bookTitle}`}
-      >
-        فتح المصدر
-        <IconExternal className="h-3.5 w-3.5" />
-      </a>
-    </li>
   );
 }

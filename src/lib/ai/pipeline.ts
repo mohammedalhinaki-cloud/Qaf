@@ -1,6 +1,6 @@
 import { config } from '@/lib/config';
 import { neutralizeInstructions, toPlainText } from '@/lib/security/sanitize';
-import type { AnswerClaim, Disagreement, Evidence, Madhhab } from '@/lib/types';
+import { SOURCE_LABEL, type AnswerClaim, type Disagreement, type Evidence, type Madhhab } from '@/lib/types';
 import { generateJson } from './gemini';
 import {
   ANSWER_SCHEMA,
@@ -84,7 +84,7 @@ export interface SynthesisResult {
 function toPromptEvidence(evidence: Evidence[]): EvidenceForPrompt[] {
   return evidence.map((e) => ({
     id: e.id,
-    sourceLabel: e.source === 'shamela' ? 'المكتبة الشاملة' : 'تراث',
+    sourceLabel: SOURCE_LABEL[e.source],
     bookTitle: e.bookTitle,
     author: e.author,
     volume: e.volume,
@@ -153,7 +153,6 @@ export async function synthesizeAnswer(
   question: string,
   madhhab: Madhhab,
   evidence: Evidence[],
-  missingSources: string[],
   signal?: AbortSignal,
 ): Promise<SynthesisResult> {
   if (evidence.length === 0) {
@@ -162,7 +161,7 @@ export async function synthesizeAnswer(
 
   const raw = await generateJson<SynthesisResult>({
     system: ANSWER_SYSTEM,
-    user: answerUser(question, madhhab, toPromptEvidence(evidence), missingSources),
+    user: answerUser(question, madhhab, toPromptEvidence(evidence)),
     schema: ANSWER_SCHEMA as unknown as Record<string, unknown>,
     temperature: 0.15,
     maxOutputTokens: 2600,

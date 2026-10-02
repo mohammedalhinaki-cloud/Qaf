@@ -161,9 +161,7 @@ export function ChatShell({ devFixtures = false }: { devFixtures?: boolean }) {
           else if (ev.type === 'source')
             setLive((l) => ({
               ...l,
-              statuses: [...l.statuses.filter((s) => s.source !== ev.status.source), ev.status].sort(
-                (a) => (a.source === 'shamela' ? -1 : 1),
-              ),
+              statuses: [ev.status],
             }));
           else if (ev.type === 'result') finalResult = ev.result;
           else if (ev.type === 'error') errorMsg = ev.message;
@@ -251,12 +249,12 @@ export function ChatShell({ devFixtures = false }: { devFixtures?: boolean }) {
                   <Wordmark />
                 </h1>
                 <p className="mx-auto mt-2 max-w-lg text-[12.5px] leading-6 text-ink-muted">
-                  الذكاء الاصطناعي للتحقق العلمي والبحث في المراجع الإسلامية الصحيحة
+                  الذكاء الاصطناعي للتحقق العلمي والبحث في المراجع الإسلامية
                 </p>
                 <p className="mx-auto mt-3 max-w-md text-[13.5px] leading-7 text-ink-muted">
-                  باحث ذكي يبحث في <strong className="font-semibold text-ink-text">المكتبة الشاملة</strong> و
-                  <strong className="font-semibold text-ink-text"> تراث</strong>، ويعرض الإجابة مع مصادرها
-                  الأصلية للتحقق منها.
+                  يبحث حُجَّة في المراجع الإسلامية عبر{' '}
+                  <strong className="font-semibold text-ink-text">تراث</strong>، ثم يعرض الإجابة مع
+                  أدلتها ومصادرها الأصلية للتحقق منها.
                 </p>
               </div>
 
@@ -365,7 +363,7 @@ export function ChatShell({ devFixtures = false }: { devFixtures?: boolean }) {
                   compact
                 />
                 <p className="mt-2 text-center text-[10.5px] text-ink-muted">
-                  الإجابات مبنية على مقاطع مسترجَعة من المكتبة الشاملة وتراث. راجع المصدر الأصلي قبل الاعتماد.
+                  الإجابات مبنية على مقاطع مسترجَعة من مكتبة تراث. راجع المصدر الأصلي قبل الاعتماد.
                 </p>
               </div>
             </div>

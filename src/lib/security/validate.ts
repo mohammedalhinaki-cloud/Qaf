@@ -58,7 +58,7 @@ export function parseAskRequest(raw: unknown): AskRequestBody {
   }
   if (looksLikeInjection(question)) {
     throw new ValidationError(
-      'لا يمكن تنفيذ هذا الطلب. حُجَّة أداة بحث موثّق في المكتبة الشاملة وتراث، ولا تقبل تعليمات تغيّر قواعد عملها.',
+      'لا يمكن تنفيذ هذا الطلب. حُجَّة أداة بحث موثّق في مكتبة تراث، ولا تقبل تعليمات تغيّر قواعد عملها.',
       'instruction_override',
     );
   }

@@ -20,6 +20,40 @@ function canUse(): boolean {
   }
 }
 
+/**
+ * ترحيل النتائج المخزَّنة من نسخ قديمة: يُبقي أدلة وحالات مصدر «تراث» فقط
+ * (كانت نسخ سابقة تعرض نتائج من مصادر أُزيلت لاحقًا)، ويحذف الحقول
+ * التي لم تعد مستخدمة. يعمل على البيانات المحلية كما هي دون فقدان المحادثات.
+ */
+function migrateResult(raw: unknown): unknown {
+  if (typeof raw !== 'object' || raw === null) return raw;
+  const r = { ...(raw as Record<string, unknown>) };
+  if (Array.isArray(r.sourceStatus)) {
+    r.sourceStatus = r.sourceStatus.filter(
+      (s) => typeof s === 'object' && s !== null && (s as { source?: unknown }).source === 'turath',
+    );
+  }
+  if (Array.isArray(r.evidence)) {
+    r.evidence = r.evidence.filter(
+      (e) => typeof e === 'object' && e !== null && (e as { source?: unknown }).source === 'turath',
+    );
+  }
+  delete r.sources; // قسم «المصادر» المنفصل أُستبدل بالاستشهادات داخل النص
+  return r;
+}
+
+function migrateConversation(c: Conversation): Conversation {
+  if (!Array.isArray(c.messages)) return c;
+  return {
+    ...c,
+    messages: c.messages.map((m) =>
+      m && m.role === 'assistant' && m.result
+        ? { ...m, result: migrateResult(m.result) as typeof m.result }
+        : m,
+    ),
+  };
+}
+
 export function loadConversations(): Conversation[] {
   if (!canUse()) return [];
   try {
@@ -38,6 +72,7 @@ export function loadConversations(): Conversation[] {
     if (!Array.isArray(parsed)) return [];
     return (parsed as Conversation[])
       .filter((c) => c && typeof c.id === 'string' && Array.isArray(c.messages))
+      .map(migrateConversation)
       .sort((a, b) => b.updatedAt - a.updatedAt);
   } catch {
     return [];

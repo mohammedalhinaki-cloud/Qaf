@@ -1,46 +1,50 @@
 'use client';
 
-import type { AskResult } from '@/lib/types';
-import { EvidenceCard, SourceCard } from './EvidenceCard';
+import { useMemo, useState } from 'react';
+import { splitAnswerText } from '@/lib/citations';
+import type { AskResult, Evidence } from '@/lib/types';
+import { CitationChip, CitationPopover } from './Citation';
+import { EvidenceCard } from './EvidenceCard';
 import { IconAlert } from './icons';
 import { SourceStatusBar } from './SourceStatusBar';
 
 /**
- * يعرض نص الإجابة كنص عادي فقط (لا HTML)، مع إبراز إشارات الأدلة [نX].
+ * يعرض نص الإجابة مع استشهادات داخلية بجانب الجمل التي تسندها.
+ * كل استشهاد مرتبط بمعرّف دليل حقيقي من نتائج البحث في تراث،
+ * وعند الضغط عليه تظهر بيانات المصدر كاملة مع رابط الموضع الأصلي.
  */
-function AnswerText({ text, validIds }: { text: string; validIds: Set<string> }) {
-  const paragraphs = text.split(/\n{1,}/).map((p) => p.trim()).filter(Boolean);
+function AnswerText({
+  text,
+  evidenceById,
+  onOpen,
+}: {
+  text: string;
+  evidenceById: Map<string, Evidence>;
+  onOpen: (ev: Evidence, anchor: DOMRect) => void;
+}) {
+  const validIds = useMemo(() => new Set(evidenceById.keys()), [evidenceById]);
+  const paragraphs = useMemo(
+    () =>
+      text
+        .split(/\n{1,}/)
+        .map((p) => p.trim())
+        .filter(Boolean),
+    [text],
+  );
 
   return (
     <div className="prose-ar text-[15.5px]">
       {paragraphs.map((para, pi) => {
-        const parts = para.split(/(\[[^\]\n]{1,80}\])/g);
+        const segments = splitAnswerText(para, validIds);
         return (
           <p key={pi}>
-            {parts.map((part, i) => {
-              const m = /^\[([^\]\n]{1,80})\]$/.exec(part);
-              if (!m) return <span key={i}>{part}</span>;
-              const ids = m[1]!
-                .split(/[,،؛;\s]+/)
-                .map((s) => s.trim())
-                .filter((s) => validIds.has(s));
-              if (ids.length === 0) return <span key={i}>{part}</span>;
-              return (
-                <sup key={i} className="mx-0.5 inline-flex gap-1 align-super">
-                  {ids.map((id) => (
-                    <a
-                      key={id}
-                      href={`#ev-${id}`}
-                      className="rounded bg-ink-accent/12 px-1 py-0.5 text-[10px] font-bold
-                                 text-ink-accent no-underline hover:bg-ink-accent/20"
-                      title="الانتقال إلى الدليل"
-                    >
-                      {id}
-                    </a>
-                  ))}
-                </sup>
-              );
-            })}
+            {segments.map((seg, i) =>
+              seg.type === 'text' ? (
+                <span key={i}>{seg.text}</span>
+              ) : (
+                <CitationChip key={`${seg.id}-${i}`} ev={evidenceById.get(seg.id)!} onOpen={onOpen} />
+              ),
+            )}
           </p>
         );
       })}
@@ -58,7 +62,15 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 export function AnswerBlock({ result }: { result: AskResult }) {
-  const validIds = new Set(result.evidence.map((e) => e.id));
+  const [cite, setCite] = useState<{ ev: Evidence; anchor: DOMRect } | null>(null);
+
+  const evidenceById = useMemo(
+    () => new Map(result.evidence.map((e) => [e.id, e])),
+    [result.evidence],
+  );
+
+  const openCite = (ev: Evidence, anchor: DOMRect) => setCite({ ev, anchor });
+  const closeCite = () => setCite(null);
 
   return (
     <div className="space-y-6">
@@ -77,7 +89,13 @@ export function AnswerBlock({ result }: { result: AskResult }) {
 
       {result.answer && (
         <section aria-label="الإجابة">
-          <AnswerText text={result.answer} validIds={validIds} />
+          <AnswerText text={result.answer} evidenceById={evidenceById} onOpen={openCite} />
+          {result.evidence.length > 0 && (
+            <p className="mt-2 text-[10.5px] leading-5 text-ink-muted">
+              الاستشهادات الملوّنة داخل النص قابلة للضغط: تعرض بيانات المصدر والنص المستخرج،
+              وتفتح الموضع الأصلي في مكتبة تراث.
+            </p>
+          )}
         </section>
       )}
 
@@ -91,16 +109,12 @@ export function AnswerBlock({ result }: { result: AskResult }) {
                 <ul className="space-y-2">
                   {d.positions.map((p, j) => (
                     <li key={j} className="prose-ar text-[14px] leading-8">
-                      <span className="text-ink-muted">—</span> {p.position}{' '}
-                      {p.evidenceIds.map((id) => (
-                        <a
-                          key={id}
-                          href={`#ev-${id}`}
-                          className="mr-1 rounded bg-ink-accent/12 px-1 py-0.5 text-[10px] font-bold text-ink-accent"
-                        >
-                          {id}
-                        </a>
-                      ))}
+                      <span className="text-ink-muted">—</span> {p.position}
+                      {p.evidenceIds.map((id) =>
+                        evidenceById.has(id) ? (
+                          <CitationChip key={id} ev={evidenceById.get(id)!} onOpen={openCite} />
+                        ) : null,
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -110,33 +124,19 @@ export function AnswerBlock({ result }: { result: AskResult }) {
         </section>
       )}
 
-      {result.evidence.length > 0 && (
-        <section aria-label="الدليل">
-          <SectionTitle>الدليل</SectionTitle>
+      {/* بطاقات الأدلة الكاملة تُعرض فقط عند غياب إجابة نصية يُعلَّق عليها الاستشهاد */}
+      {!result.answer && result.evidence.length > 0 && (
+        <section aria-label="المقاطع المسترجعة">
+          <SectionTitle>المقاطع المسترجعة من تراث</SectionTitle>
           <div className="space-y-3">
             {result.evidence.map((ev) => (
-              <div key={ev.id} id={`ev-${ev.id}`} className="scroll-mt-20">
-                <EvidenceCard ev={ev} />
-              </div>
+              <EvidenceCard key={ev.id} ev={ev} />
             ))}
           </div>
         </section>
       )}
 
-      {result.sources.length > 0 && (
-        <section aria-label="المصادر">
-          <SectionTitle>المصادر</SectionTitle>
-          <ul className="space-y-2">
-            {result.sources.map((ev) => (
-              <SourceCard key={`src-${ev.id}`} ev={ev} />
-            ))}
-          </ul>
-          <p className="mt-3 text-[11px] leading-5 text-ink-muted">
-            الروابط تفتح الموضع في موقع المصدر الأصلي (المكتبة الشاملة أو تراث)، لا في هذا الموقع. ما لم يُحدَّد
-            الجزء أو الصفحة فذلك لعدم توفّرهما في بيانات المصدر.
-          </p>
-        </section>
-      )}
+      {cite && <CitationPopover key={cite.ev.id} ev={cite.ev} anchor={cite.anchor} onClose={closeCite} />}
     </div>
   );
 }

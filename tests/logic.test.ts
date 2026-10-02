@@ -5,9 +5,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { citationLabel, shortBookTitle, splitAnswerText } from '../src/lib/citations.ts';
 import { neutralizeInstructions, safeSourceUrl, toPlainText, toSnippet } from '../src/lib/security/sanitize.ts';
 import { matchMadhhab } from '../src/lib/search/madhhab.ts';
-import { dedupe, interleaveBySource, normalizeArabic, scoreEvidence, tokens } from '../src/lib/search/rank.ts';
+import { dedupe, normalizeArabic, scoreEvidence, tokens } from '../src/lib/search/rank.ts';
 import type { Evidence } from '../src/lib/types.ts';
 
 /* ———————————— التنظيف ———————————— */
@@ -39,9 +40,10 @@ test('toSnippet يحوّل إلى سطر واحد ويقصّ', () => {
 
 /* ———————————— الروابط ———————————— */
 
-test('safeSourceUrl يقبل نطاقات المصدرين فقط', () => {
+test('safeSourceUrl يقبل نطاق تراث فقط ويرفض غيره', () => {
   assert.ok(safeSourceUrl('https://app.turath.io/book/1/2', ['turath.io']));
-  assert.ok(safeSourceUrl('https://shamela.ws/book/1/2', ['shamela.ws']));
+  // المكتبة الشاملة لم تعد مصدرًا: روابطها تُرفض مثل أي نطاق خارج
+  assert.equal(safeSourceUrl('https://shamela.ws/book/1/2', ['turath.io']), null);
   assert.equal(safeSourceUrl('https://evil.com/book/1', ['turath.io']), null);
   assert.equal(safeSourceUrl('https://turath.io.evil.com/x', ['turath.io']), null);
   assert.equal(safeSourceUrl('javascript:alert(1)', ['turath.io']), null);
@@ -148,14 +150,55 @@ test('dedupe يحذف النصوص شبه المتطابقة', () => {
   assert.equal(dedupe(list).length, 1);
 });
 
-test('interleaveBySource يوزّع المقاعد بين المصدرين', () => {
-  const list = [
-    { ...ev({ source: 'turath', bookId: 't1', pageId: 1 }), score: 10 },
-    { ...ev({ source: 'turath', bookId: 't2', pageId: 2 }), score: 9 },
-    { ...ev({ source: 'turath', bookId: 't3', pageId: 3 }), score: 8 },
-    { ...ev({ source: 'shamela', bookId: 's1', pageId: 1, url: 'https://shamela.ws/book/1/1' }), score: 2 },
-  ] as Evidence[];
-  const out = interleaveBySource(list, 4);
-  assert.equal(out.length, 4);
-  assert.ok(out.some((e) => e.source === 'shamela'), 'يجب أن يبقى للشاملة مقعد رغم انخفاض درجتها');
+/* ———————————— الاستشهادات الداخلية ———————————— */
+
+test('shortBookTitle يقصّ العناوين الطويلة عند حدود الكلمات', () => {
+  assert.equal(shortBookTitle('المجموع شرح المهذب'), 'المجموع شرح المهذب');
+  assert.equal(shortBookTitle('أصول الفقه - ابن مفلح'), 'أصول الفقه');
+  const long = shortBookTitle('مقاصد المكلفين فيما يتعبد به لرب العالمين');
+  assert.ok(long.length <= 20);
+  assert.ok(long.endsWith('…'));
+  assert.ok(long.startsWith('مقاصد'));
+});
+
+test('citationLabel يبني الإحالة من بيانات المصدر فقط', () => {
+  assert.equal(
+    citationLabel({ bookTitle: 'المجموع شرح المهذب', volume: '3', page: 301 }),
+    'المجموع شرح المهذب 3/301',
+  );
+  assert.equal(citationLabel({ bookTitle: 'المغني', volume: '2' }), 'المغني جـ2');
+  assert.equal(citationLabel({ bookTitle: 'المغني', page: 145 }), 'المغني ص145');
+  assert.equal(citationLabel({ bookTitle: 'المغني' }), 'المغني');
+});
+
+test('splitAnswerText يحوّل الإشارات الصالحة إلى استشهادات مستقلة', () => {
+  const valid = new Set(['ن1', 'ن3']);
+  const segs = splitAnswerText('ذهب الجمهور إلى الوجوب [ن1] وخالف الحنفية [ن3، ن1]', valid);
+  assert.deepEqual(segs, [
+    { type: 'text', text: 'ذهب الجمهور إلى الوجوب ' },
+    { type: 'cite', id: 'ن1' },
+    { type: 'text', text: ' وخالف الحنفية ' },
+    { type: 'cite', id: 'ن3' },
+    { type: 'cite', id: 'ن1' },
+  ]);
+});
+
+test('splitAnswerText لا يحوّل معرّفًا غير موجود إلى استشهاد', () => {
+  const valid = new Set(['ن1']);
+  const segs = splitAnswerText('نص [ن9] لا يستند إلى دليل، ونص آخر [ن1] يستند.', valid);
+  const cites = segs.filter((s) => s.type === 'cite');
+  assert.equal(cites.length, 1);
+  assert.equal(cites[0]!.type === 'cite' && cites[0].id, 'ن1');
+  // [ن9] يبقى نصًا عاديًا كما ورد
+  const joined = segs.map((s) => (s.type === 'text' ? s.text : '[استشهاد]')).join('');
+  assert.ok(joined.includes('[ن9]'));
+});
+
+test('splitAnswerText يترك الأقواس غير الاستشهادية نصًا عاديًا', () => {
+  const valid = new Set(['ن1']);
+  const segs = splitAnswerText('قال (ابن قدامة) [شرح] في باب النية [ن1].', valid);
+  const cites = segs.filter((s) => s.type === 'cite');
+  assert.equal(cites.length, 1);
+  const joined = segs.map((s) => (s.type === 'text' ? s.text : '[استشهاد]')).join('');
+  assert.ok(joined.includes('[شرح]'));
 });

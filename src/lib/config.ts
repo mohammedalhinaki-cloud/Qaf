@@ -31,11 +31,6 @@ export const config = {
     appBase: envStr('TURATH_APP_BASE', 'https://app.turath.io'),
     apiVersion: 3,
   },
-  shamela: {
-    enabled: envBool('SHAMELA_ENABLED', true),
-    mcpUrl: envStr('SHAMELA_MCP_URL', 'https://shamela.ws/mcp'),
-    webBase: envStr('SHAMELA_WEB_BASE', 'https://shamela.ws'),
-  },
   limits: {
     ratePerMinute: envInt('RATE_LIMIT_PER_MINUTE', 10),
     maxQuestionChars: envInt('MAX_QUESTION_CHARS', 500),
@@ -43,11 +38,11 @@ export const config = {
     maxEvidence: 12,
     /** أقصى عدد أحرف من نص المقطع الواحد يُمرّر إلى النموذج */
     maxSnippetChars: 1400,
-    /** أقصى عدد نتائج تُطلب من كل مصدر لكل استعلام */
+    /** أقصى عدد نتائج تُطلب من تراث لكل استعلام */
     maxResultsPerQuery: 10,
     /** أقصى عدد استعلامات بحث مولّدة */
     maxQueries: 3,
-    /** مهلة كل مصدر بالمللي ثانية */
+    /** مهلة مصدر البحث بالمللي ثانية */
     sourceTimeoutMs: 15000,
     /** مهلة طلب النموذج */
     aiTimeoutMs: 45000,
