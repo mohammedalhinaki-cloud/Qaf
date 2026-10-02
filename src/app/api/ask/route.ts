@@ -5,14 +5,7 @@ import { config } from '@/lib/config';
 import { clientKey, rateLimit } from '@/lib/security/ratelimit';
 import { ValidationError, parseAskRequest } from '@/lib/security/validate';
 import { buildSourceNotice, searchAllSources } from '@/lib/search/orchestrator';
-import {
-  SOURCE_LABEL,
-  STAGE_LABEL,
-  type AskEvent,
-  type AskResult,
-  type Evidence,
-  type SourceStatus,
-} from '@/lib/types';
+import { STAGE_LABEL, type AskEvent, type AskResult } from '@/lib/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -96,13 +89,12 @@ export async function POST(req: NextRequest) {
             queries: [],
             sourceStatus: [],
             evidence: [],
-            sources: [],
             answer: null,
             claims: [],
             disagreements: [],
             insufficient: true,
             notice:
-              'هذا السؤال خارج نطاق ما يمكن البحث عنه في المكتبة الشاملة وتراث. حُجَّة يبحث في كتب التراث الإسلامي فقط.',
+              'هذا السؤال خارج نطاق ما يمكن البحث عنه في تراث. حُجَّة يبحث في كتب التراث الإسلامي المتوفرة في مكتبة تراث فقط.',
             createdAt: Date.now(),
           };
           send({ type: 'result', result });
@@ -114,7 +106,7 @@ export async function POST(req: NextRequest) {
         send({ type: 'queries', queries: plan.queries });
         send({ type: 'stage', stage: 'searching', label: STAGE_LABEL.searching });
 
-        const statuses: SourceStatus[] = [];
+        const statuses: AskResult['sourceStatus'] = [];
         const { evidence } = await searchAllSources(plan.queries, madhhab, (s) => {
           statuses.push(s);
           send({ type: 'source', status: s });
@@ -122,24 +114,25 @@ export async function POST(req: NextRequest) {
 
         send({ type: 'stage', stage: 'collecting', label: STAGE_LABEL.collecting });
 
-        const ordered = statuses.sort((a, b) => (a.source === 'shamela' ? -1 : 1));
-        const bothFailed = ordered.every((s) => s.status === 'error' || s.status === 'timeout');
+        const sourceStatus = statuses[0];
+        const sourceFailed =
+          sourceStatus !== undefined &&
+          (sourceStatus.status === 'error' || sourceStatus.status === 'timeout');
 
-        /* ——— فشل المصدرين معًا: لا إجابة تخمينية ——— */
-        if (bothFailed) {
+        /* ——— فشل مصدر البحث: لا إجابة تخمينية ——— */
+        if (sourceFailed) {
           const result: AskResult = {
             questionId: crypto.randomUUID(),
             question,
             madhhab,
             queries: plan.queries,
-            sourceStatus: ordered,
+            sourceStatus: statuses,
             evidence: [],
-            sources: [],
             answer: null,
             claims: [],
             disagreements: [],
             insufficient: true,
-            notice: 'تعذّر الوصول إلى المصادر حاليًا، لذلك لم أتمكن من التحقق من الإجابة.',
+            notice: 'تعذّر الوصول إلى مكتبة تراث حاليًا، لذلك لم أتمكن من التحقق من الإجابة.',
             createdAt: Date.now(),
           };
           send({ type: 'result', result });
@@ -148,28 +141,23 @@ export async function POST(req: NextRequest) {
           return;
         }
 
-        const missingSources = ordered
-          .filter((s) => s.status === 'error' || s.status === 'timeout')
-          .map((s) => SOURCE_LABEL[s.source]);
-
         /* ——— لا أدلة: نُصرّح بذلك ——— */
         if (evidence.length === 0) {
+          const disabled = sourceStatus?.status === 'disabled';
           const result: AskResult = {
             questionId: crypto.randomUUID(),
             question,
             madhhab,
             queries: plan.queries,
-            sourceStatus: ordered,
+            sourceStatus: statuses,
             evidence: [],
-            sources: [],
             answer: null,
             claims: [],
             disagreements: [],
             insufficient: true,
-            notice:
-              missingSources.length > 0
-                ? `لم أجد مادة كافية في المصادر التي تم البحث فيها، مع العلم أن ${missingSources.join('، ')} لم تكن متاحة.`
-                : 'لم أجد مادة كافية في المكتبة الشاملة وتراث عن هذا السؤال بهذه الصياغة. جرّب صياغة أدق أو مصطلحًا فقهيًا أقرب.',
+            notice: disabled
+              ? 'مصدر البحث (تراث) معطّل في إعدادات الخادم، لذلك لم يتم تنفيذ أي بحث.'
+              : 'لم أجد مادة كافية في مكتبة تراث عن هذا السؤال بهذه الصياغة. جرّب صياغة أدق أو مصطلحًا فقهيًا أقرب.',
             createdAt: Date.now(),
           };
           send({ type: 'result', result });
@@ -182,7 +170,7 @@ export async function POST(req: NextRequest) {
 
         let synthesis;
         try {
-          synthesis = await synthesizeAnswer(question, madhhab, evidence, missingSources, req.signal);
+          synthesis = await synthesizeAnswer(question, madhhab, evidence, req.signal);
         } catch (e) {
           // فشل النموذج بعد نجاح البحث: لا نُضيّع مادة حقيقية استُرجعت فعلًا.
           // نعرض المقاطع كما هي ونوضّح أن الصياغة لم تتم. ولا نعرض أي إجابة.
@@ -192,14 +180,13 @@ export async function POST(req: NextRequest) {
             question,
             madhhab,
             queries: plan.queries,
-            sourceStatus: ordered,
+            sourceStatus: statuses,
             evidence: evidence.slice(0, 5),
-            sources: evidence.slice(0, 5),
             answer: null,
             claims: [],
             disagreements: [],
             insufficient: true,
-            notice: `${reason} عُثر على المقاطع التالية في المصادر، وهي معروضة كما وردت دون صياغة.`,
+            notice: `${reason} عُثر على المقاطع التالية في تراث، وهي معروضة كما وردت دون صياغة.`,
             createdAt: Date.now(),
           };
           send({ type: 'result', result });
@@ -208,26 +195,26 @@ export async function POST(req: NextRequest) {
           return;
         }
 
-        // المصادر المعروضة: المستشهَد بها أولًا (3–5 عند توفرها)
+        // الأدلة المعروضة: المستشهَد بها فعليًا داخل نص الإجابة عند توفرها
         const usedSet = new Set(synthesis.usedIds);
-        const cited: Evidence[] = evidence.filter((e) => usedSet.has(e.id));
-        const sources = (cited.length > 0 ? cited : evidence).slice(0, 5);
-        const shownEvidence = cited.length > 0 ? cited : evidence.slice(0, 5);
+        const cited = evidence.filter((e) => usedSet.has(e.id));
+        const shownEvidence = synthesis.insufficient
+          ? evidence.slice(0, 5)
+          : cited.length > 0
+            ? cited
+            : evidence.slice(0, 5);
 
         const notice = synthesis.insufficient
-          ? missingSources.length > 0
-            ? `لم أجد في المقاطع المسترجَعة ما يكفي للإجابة بدقة، مع العلم أن ${missingSources.join('، ')} لم تكن متاحة. المقاطع التي عُثر عليها معروضة أدناه للاطلاع.`
-            : 'لم أجد في المصادر التي تم البحث فيها مادة كافية للإجابة عن هذا السؤال بدقة. المقاطع الأقرب معروضة أدناه للاطلاع.'
-          : buildSourceNotice(ordered, madhhab);
+          ? 'لم أجد في المقاطع المسترجَعة من تراث ما يكفي للإجابة عن هذا السؤال بدقة. المقاطع الأقرب معروضة أدناه للاطلاع.'
+          : buildSourceNotice(madhhab);
 
         const result: AskResult = {
           questionId: crypto.randomUUID(),
           question,
           madhhab,
           queries: plan.queries,
-          sourceStatus: ordered,
+          sourceStatus: statuses,
           evidence: shownEvidence,
-          sources,
           answer: synthesis.answer,
           claims: synthesis.claims,
           disagreements: synthesis.disagreements,

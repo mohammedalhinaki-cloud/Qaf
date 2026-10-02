@@ -34,7 +34,7 @@ export function SourceStatusBar({
         {pending && (
           <span className="chip">
             <IconSearch className="h-3.5 w-3.5 dot-pulse" />
-            جارٍ البحث في المصدرين…
+            جارٍ البحث في تراث…
           </span>
         )}
 

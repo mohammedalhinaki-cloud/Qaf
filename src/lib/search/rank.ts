@@ -63,7 +63,7 @@ export function scoreEvidence(ev: Omit<Evidence, 'score'>, queryTokens: string[]
   return Math.round(score * 100) / 100;
 }
 
-/** إزالة التكرار: نفس المصدر ونفس الكتاب ونفس الصفحة، أو نص شبه متطابق. */
+/** إزالة التكرار: نفس الكتاب ونفس الصفحة، أو نص شبه متطابق. */
 export function dedupe(list: Evidence[]): Evidence[] {
   const seenKey = new Set<string>();
   const seenText = new Set<string>();
@@ -81,29 +81,4 @@ export function dedupe(list: Evidence[]): Evidence[] {
     out.push(ev);
   }
   return out;
-}
-
-/**
- * توزيع عادل بين المصدرين: نتناوب بينهما حسب الترتيب
- * حتى لا يبتلع مصدر واحد كل المقاعد.
- */
-export function interleaveBySource(list: Evidence[], limit: number): Evidence[] {
-  const bySource = new Map<string, Evidence[]>();
-  for (const ev of list) {
-    const arr = bySource.get(ev.source) ?? [];
-    arr.push(ev);
-    bySource.set(ev.source, arr);
-  }
-  for (const arr of bySource.values()) arr.sort((a, b) => b.score - a.score);
-
-  const out: Evidence[] = [];
-  const queues = [...bySource.values()];
-  let i = 0;
-  while (out.length < limit && queues.some((q) => q.length > 0)) {
-    const q = queues[i % queues.length]!;
-    const next = q.shift();
-    if (next) out.push(next);
-    i += 1;
-  }
-  return out.sort((a, b) => b.score - a.score);
 }

@@ -1,9 +1,9 @@
 /** الأنواع المشتركة بين الخادم والواجهة. */
 
-export type SourceId = 'shamela' | 'turath';
+/** مصدر البحث الوحيد: تراث. */
+export type SourceId = 'turath';
 
 export const SOURCE_LABEL: Record<SourceId, string> = {
-  shamela: 'المكتبة الشاملة',
   turath: 'تراث',
 };
 
@@ -18,7 +18,7 @@ export const MADHHAB_LABEL: Record<Madhhab, string> = {
 };
 
 /**
- * مقطع نصي مسترجَع من أحد المصدرين.
+ * مقطع نصي مسترجَع من تراث.
  * كل حقل هنا يأتي حرفيًا من المصدر — الحقول غير المتوفرة تبقى undefined
  * ولا تُملأ بالتخمين.
  */
@@ -85,13 +85,11 @@ export interface AskResult {
   questionId: string;
   question: string;
   madhhab: Madhhab;
-  /** الاستعلامات التي أُرسلت فعليًا إلى المصدرين */
+  /** الاستعلامات التي أُرسلت فعليًا إلى تراث */
   queries: string[];
   sourceStatus: SourceStatus[];
-  /** الأدلة المعروضة (مرتبة) */
+  /** الأدلة المستخدمة في الاستشهادات داخل النص (مرتبة) */
   evidence: Evidence[];
-  /** المصادر المختصرة للعرض (3–5 عند توفرها) */
-  sources: Evidence[];
   /** نص الإجابة، أو null عند عدم كفاية الأدلة */
   answer: string | null;
   claims: AnswerClaim[];
@@ -121,7 +119,7 @@ export type StageId =
 
 export const STAGE_LABEL: Record<StageId, string> = {
   analyzing: 'تحليل السؤال وصياغة استعلامات البحث',
-  searching: 'البحث في المكتبة الشاملة وتراث',
+  searching: 'البحث في تراث',
   collecting: 'جمع المقاطع وترتيبها',
   reasoning: 'تحليل الأدلة وصياغة الإجابة',
   done: 'اكتمل',

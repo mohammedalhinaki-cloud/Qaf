@@ -115,9 +115,7 @@ export function Sidebar({ conversations, activeId, open, onClose, onNew, onSelec
         </nav>
 
         <div className="flex items-center justify-between gap-2 border-t border-ink-line px-3 py-3">
-          <p className="text-[11px] leading-5 text-ink-muted">
-            المصادر: المكتبة الشاملة · تراث
-          </p>
+          <p className="text-[11px] leading-5 text-ink-muted">المصدر: مكتبة تراث</p>
           <ThemeToggle />
         </div>
       </aside>

@@ -49,8 +49,8 @@ export function toSnippet(input: unknown, maxChars = 320): string {
 }
 
 /**
- * يسمح فقط بروابط http/https إلى نطاقات المصدرين المعتمدين.
- * أي رابط آخر يُرفض ويُعاد null — لا نعرض روابط خارج المصدرين.
+ * يسمح فقط بروابط http/https إلى نطاق المصدر المعتمد (تراث).
+ * أي رابط آخر يُرفض ويُعاد null — لا نعرض روابط خارج المصدر.
  */
 export function safeSourceUrl(raw: unknown, allowedHosts: string[]): string | null {
   if (typeof raw !== 'string' || raw.trim() === '') return null;
