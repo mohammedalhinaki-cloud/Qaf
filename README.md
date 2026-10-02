@@ -84,9 +84,9 @@ npm run dev                     # http://localhost:3000
 
 **المفتاح يُقرأ على الخادم فقط.** لا يصل إلى المتصفح، ولا يظهر في أي سجل، وتُنقّى رسائل أخطاء Gemini منه قبل عرضها.
 
-### النشر على Vercel والنطاق
+### النشر على Cloudflare والنطاق
 
-ادفع المستودع، ثم أضف `GEMINI_API_KEY` في Environment Variables. لا حاجة إلى قاعدة بيانات.
+ادفع المشروع إلى Cloudflare Pages/Workers (باستخدام إعداد Next.js المناسب في حسابك)، ثم أضف `GEMINI_API_KEY` كـ Secret على الخادم. لا حاجة إلى قاعدة بيانات.
 
 **النطاق المقصود لهذا المشروع هو النطاق الفرعي فقط:**
 
@@ -94,17 +94,11 @@ npm run dev                     # http://localhost:3000
 hujjah.maaoun.com
 ```
 
-- النطاق الرئيسي `maaoun.com` يخصّ MAAOUN ولا يُمسّ ولا يُعاد توجيهه من هنا.
-- في Vercel: Project → Settings → Domains → Add → `hujjah.maaoun.com`، واجعله Production domain.
-- سجلّ DNS المطلوب عند مزوّد DNS الخاص بـ `maaoun.com` (خارج المستودع):
-
-| Type | Name | Value | TTL |
-|---|---|---|---|
-| `CNAME` | `hujjah` | `cname.vercel-dns.com` | Auto / 3600 |
-
-  (إن طلبت لوحة Vercel قيمة مختلفة، فالقيمة المعروضة في لوحة Vercel هي المرجع.)
-- بعد تحقق Vercel من النطاق، يصبح الموقع على <https://hujjah.maaoun.com>.
-- `metadataBase` و Open Graph و`canonical` مضبوطة على هذا النطاق في `src/app/layout.tsx`.
+- أضف النطاق الفرعي من Cloudflare Pages → Custom domains، أو أنشئ `CNAME` باسم `hujjah` إلى عنوان Pages الذي تعرضه Cloudflare.
+- لا تضف `maaoun.com` أو `www.maaoun.com` إلى هذا المشروع، ولا تنشئ إعادة توجيه منهما إلى حُجَّة.
+- يتأكد `src/middleware.ts` من المضيف ويرفض الطلبات الواردة على أي نطاق آخر؛ لذلك لا يمكن للتطبيق أن يتقمص الموقع الرئيسي إذا أُضيف نطاق خاطئ.
+- `metadataBase` و Open Graph و`canonical` مضبوطة على `https://hujjah.maaoun.com`، كما أن عنوان ووصف SEO والكلمات المفتاحية مضبوطة في `src/app/layout.tsx`.
+- اترك إدارة `maaoun.com` ومحتواه في إعداد Cloudflare الأصلي، منفصلًا عن خدمة حُجَّة.
 
 ### الاختبارات
 

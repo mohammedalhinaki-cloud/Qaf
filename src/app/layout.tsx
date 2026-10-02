@@ -3,9 +3,19 @@ import './globals.css';
 
 const SITE_URL = 'https://hujjah.maaoun.com';
 const SITE_NAME = 'حُجَّة';
-const SITE_TAGLINE = 'حُجَّة — الذكاء الاصطناعي للتحقق العلمي والبحث في المراجع الإسلامية الصحيحة';
+const SITE_TAGLINE = 'حُجَّة — الباحث الإسلامي الذكي بالأدلة والمصادر';
 const SITE_DESCRIPTION =
-  'باحث ذكي يبحث في المراجع الإسلامية، ويعرض الإجابة مع مصادرها الأصلية للتحقق منها.';
+  'محرك بحث بالذكاء الاصطناعي موثق بالأدلة والمراجع التراثية. يتيح لك البحث المباشر في أمهات الكتب عبر المكتبة الشاملة وتراث مع استخراج النصوص ورقم الصفحة والجزء بدقة.';
+const SITE_KEYWORDS = [
+  'حجة',
+  'ذكاء اصطناعي إسلامي',
+  'المكتبة الشاملة',
+  'تراث',
+  'بحث في الكتب الإسلامية',
+  'تخريج الأحاديث',
+  'الفقه المقارن',
+  'المصادر الإسلامية',
+];
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -14,6 +24,7 @@ export const metadata: Metadata = {
     template: `%s — ${SITE_NAME}`,
   },
   description: SITE_DESCRIPTION,
+  keywords: SITE_KEYWORDS,
   applicationName: SITE_NAME,
   manifest: '/manifest.webmanifest',
   robots: { index: true, follow: true },
