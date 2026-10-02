@@ -93,7 +93,9 @@ npm run preview  # يبني التطبيق ويشغّله محليًا على ru
 npm run deploy   # يبني وينشر Worker باسم qaf
 ```
 
-أضف `GEMINI_API_KEY` كـ **Secret** من Cloudflare Workers → `qaf` → Settings → Variables and Secrets. لا حاجة إلى قاعدة بيانات أو Supabase في النسخة الحالية.
+عند استخدام Cloudflare Workers Builds حيث يكون أمر البناء `npm run build` وأمر النشر `npx wrangler preview`، فإن `npm run build` يقوم الآن بثلاث خطوات: `next build` ثم تحويل OpenNext إلى `.open-next` ثم حقن قيم `previews.vars` المطلوبة في `wrangler.jsonc` من متغيرات البيئة داخل بيئة البناء.
+
+أضف `GEMINI_API_KEY` كـ **Secret** من Cloudflare Workers → `qaf` → Settings → Variables and Secrets، واجعله متاحًا كذلك لبيئة الـ Preview/Build. لا تضع المفتاح داخل `wrangler.jsonc` في Git. لا حاجة إلى قاعدة بيانات أو Supabase في النسخة الحالية.
 
 **النطاق المقصود لهذا المشروع هو النطاق الفرعي فقط:**
 

@@ -1,6 +1,8 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  // مطلوب لأن `npm run build` يشغّل OpenNext مع --skipNextBuild بعد انتهاء next build.
+  output: 'standalone',
   reactStrictMode: true,
   poweredByHeader: false,
   async headers() {
