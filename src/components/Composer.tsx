@@ -1,14 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useSpeechInput } from '@/lib/speech/useSpeechInput';
 import { MADHHAB_LABEL, SOURCE_LABEL, type Madhhab } from '@/lib/types';
 import {
   IconArrowUp,
-  IconCheck,
   IconChevronDown,
   IconFilter,
-  IconLibrary,
   IconMic,
   IconStop,
 } from './icons';
@@ -78,10 +76,6 @@ export function Composer({
   const valueRef = useRef(value);
   valueRef.current = value;
 
-  const [sourcesOpen, setSourcesOpen] = useState(false);
-  const sourcesBtnRef = useRef<HTMLButtonElement>(null);
-  const sourcesPanelRef = useRef<HTMLDivElement>(null);
-
   // ارتفاع تلقائي
   useEffect(() => {
     const el = ref.current;
@@ -89,27 +83,6 @@ export function Composer({
     el.style.height = 'auto';
     el.style.height = `${Math.min(el.scrollHeight, compact ? 180 : 220)}px`;
   }, [value, compact]);
-
-  /* ——— إغلاق قائمة المصادر بالنقر خارجها أو بمفتاح الهروب ——— */
-  useEffect(() => {
-    if (!sourcesOpen) return;
-    function onPointer(e: MouseEvent | TouchEvent) {
-      const target = e.target as Node;
-      const inside =
-        sourcesBtnRef.current?.contains(target) === true ||
-        sourcesPanelRef.current?.contains(target) === true;
-      if (!inside) setSourcesOpen(false);
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setSourcesOpen(false);
-    }
-    document.addEventListener('mousedown', onPointer);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onPointer);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [sourcesOpen]);
 
   /* ——— الإملاء الصوتي: يضع النص في مربع الإدخال عند إيقاف التسجيل ——— */
   const handleTranscript = useCallback(
@@ -235,20 +208,6 @@ export function Composer({
                 </select>
               </div>
 
-              {/* شريحة المصادر (لوحتها تُرسم خارج البطاقة تفاديًا لقصّها) */}
-              <button
-                type="button"
-                ref={sourcesBtnRef}
-                onClick={() => setSourcesOpen((o) => !o)}
-                aria-expanded={sourcesOpen}
-                aria-haspopup="dialog"
-                title="نطاق البحث"
-                className={PILL}
-              >
-                <IconLibrary className="h-3 w-3 shrink-0" />
-                جميع المصادر
-                <IconChevronDown className="h-3 w-3 shrink-0 opacity-70" />
-              </button>
             </div>
 
             {/* يمين (في RTL: نهاية السطر) — العدّاد والميكروفون وزر الإرسال */}
@@ -306,31 +265,6 @@ export function Composer({
           </div>
         </div>
 
-        {/* لوحة «جميع المصادر»: فوق البطاقة ومحاذية لبدايتها */}
-        {sourcesOpen && (
-          <div
-            ref={sourcesPanelRef}
-            role="dialog"
-            aria-label="نطاق البحث"
-            className="modal-rise absolute bottom-full start-3 z-30 mb-2 w-60 rounded-2xl border
-                       border-gray-200 bg-white p-3 text-right shadow-xl dark:border-gray-700/60
-                       dark:bg-[#1e232a]"
-          >
-            <p className="mb-2 text-[11px] text-gray-500 dark:text-gray-400">
-              يبحث حُجَّة في المصادر الموثّقة التالية:
-            </p>
-            <div className="flex items-center justify-between rounded-xl bg-gray-100 px-2.5 py-2 dark:bg-gray-800">
-              <span className="flex items-center gap-2 text-xs text-gray-800 dark:text-gray-200">
-                <IconLibrary className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />
-                {SOURCE_LABEL.turath}
-              </span>
-              <IconCheck className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />
-            </div>
-            <p className="mt-2 text-[10.5px] leading-5 text-gray-400">
-              لا تُستعمل أي معرفة خارج هذه المصادر، وكل إحالة تُعاد إلى موضعها الأصلي.
-            </p>
-          </div>
-        )}
       </div>
 
       {caption && (

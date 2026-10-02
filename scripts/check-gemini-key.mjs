@@ -23,7 +23,7 @@ const KEY_NAMES = [
   'GEMINI_API_KEY_BUILD',
 ];
 
-const DEFAULT_MODEL = 'gemini-2.0-flash';
+const DEFAULT_MODEL = 'gemini-2.5-flash';
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 
 function cleanSecret(value) {
@@ -147,7 +147,7 @@ async function checkLocal() {
 
   const detail = body?.error?.message ?? '';
   if (res.status === 404) {
-    console.error(`❌ النموذج «${model}» غير متاح لهذا المفتاح. جرّب GEMINI_MODEL=gemini-2.0-flash`);
+    console.error(`❌ النموذج «${model}» غير متاح لهذا المفتاح. جرّب GEMINI_MODEL=gemini-2.5-flash`);
   } else if (res.status === 429) {
     console.error('❌ تجاوز حدّ الاستخدام مؤقتًا؛ أعد المحاولة لاحقًا.');
   } else if (res.status === 401 || res.status === 403 || /api key/i.test(detail)) {
