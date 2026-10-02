@@ -64,7 +64,9 @@ export async function POST(req: NextRequest) {
 
   if (!isGeminiConfigured()) {
     return jsonError(
-      'النظام غير مهيّأ: مفتاح Gemini غير مضبوط على الخادم. أضف GEMINI_API_KEY في متغيرات البيئة.',
+      'النظام غير مهيّأ: مفتاح Gemini غير مضبوط في هذا النشر تحديدًا. ' +
+        'للإنتاج أضِف GEMINI_API_KEY كـ Secret في إعدادات الـ Worker (Variables and Secrets)، ' +
+        'وللمعاينة نفّذ wrangler preview secret put GEMINI_API_KEY ثم أنشئ نشر معاينة جديدًا.',
       503,
       'missing_key',
     );

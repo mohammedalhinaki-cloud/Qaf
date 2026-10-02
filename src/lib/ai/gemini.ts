@@ -56,7 +56,8 @@ function scrub(message: string): string {
 export async function generateJson<T>(opts: GenerateOptions): Promise<T> {
   if (!isGeminiConfigured()) {
     throw new GeminiError(
-      'مفتاح Gemini غير مضبوط على الخادم. أضف GEMINI_API_KEY في متغيرات البيئة.',
+      'مفتاح Gemini غير مضبوط في هذا النشر تحديدًا. أضف GEMINI_API_KEY كـ Secret لبيئة الإنتاج، ' +
+        'وللمعاينة نفّذ wrangler preview secret put GEMINI_API_KEY ثم أنشئ نشر معاينة جديدًا.',
       'missing_key',
     );
   }

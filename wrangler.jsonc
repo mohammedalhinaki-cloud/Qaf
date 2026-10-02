@@ -8,6 +8,16 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  // النطاق الرسمي: يُربط تلقائيًا بكل نشر إنتاجي (`wrangler deploy` / أمر النشر
+  // للفرع الرئيسي في Workers Builds)؛ يُنشئ Cloudflare سجل DNS والشهادة تلقائيًا
+  // ما دامت zone `maaoun.com` في الحساب نفسه. المعاينات لا تطالب بهذا النطاق.
+  "routes": [
+    {
+      "pattern": "hujjah.maaoun.com",
+      "custom_domain": true,
+      "previews_enabled": false
+    }
+  ],
   "services": [
     {
       "binding": "WORKER_SELF_REFERENCE",

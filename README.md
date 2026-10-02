@@ -93,9 +93,40 @@ npm run preview  # يبني التطبيق ويشغّله محليًا على ru
 npm run deploy   # يبني وينشر Worker باسم qaf
 ```
 
-عند استخدام Cloudflare Workers Builds حيث يكون أمر البناء `npm run build` وأمر النشر `npx wrangler preview`، فإن `npm run build` يقوم الآن بثلاث خطوات: `next build` ثم تحويل OpenNext إلى `.open-next` ثم حقن قيم `previews.vars` المطلوبة في `wrangler.jsonc` من متغيرات البيئة داخل بيئة البناء.
+#### أ) لماذا ظهر «الصفحة غير موجودة» على hujjah.maaoun.com، والحل
 
-أضف `GEMINI_API_KEY` كـ **Secret** من Cloudflare Workers → `qaf` → Settings → Variables and Secrets، واجعله متاحًا كذلك لبيئة الـ Preview/Build. لا تضع المفتاح داخل `wrangler.jsonc` في Git. لا حاجة إلى قاعدة بيانات أو Supabase في النسخة الحالية.
+السبب: أمر النشر المضبوط في Workers Builds هو `npx wrangler preview`، وهذا الأمر يُنشئ **نشر معاينة (Preview deployment) فقط** — أي روابط بالشكل `…-qaf.workers.dev` — ولا ينشر شيئًا إلى الإنتاج. النطاق المخصص لا يُخدَّم إلا من **نشر إنتاجي** فعلي. الحل خطوتان:
+
+1. **غيّر أمر النشر الخاص بالإنتاج** في إعدادات Workers Builds إلى:
+   ```
+   npx wrangler deploy
+   ```
+   (أو نفّذ `npm run deploy` محليًا بعد تسجيل الدخول بـ `npx wrangler login`). أمرَا البناء والمعاينة يبقيان كما هما: `npm run build` و`npx wrangler preview`.
+2. **ربط النطاق أصبح تلقائيًا**: ملف `wrangler.jsonc` يتضمن الآن مسار Custom Domain لـ `hujjah.maaoun.com`، فيُنشئ Cloudflare سجل DNS والشهادة مع أول نشر إنتاجي — لا حاجة لإضافته يدويًا من Domains & Routes. شرطان فقط:
+   - أن تكون zone `maaoun.com` مفعّلة في حساب Cloudflare نفسه الذي فيه الـ Worker `qaf`.
+   - احذف أي سجل DNS يدوي قديم باسم `hujjah` (من نوع A أو CNAME) إن وُجد، لأنه سيتعارض مع السجل التلقائي.
+
+للتحقق بعد النشر: <https://hujjah.maaoun.com/api/health> يجب أن يُرجع ‏`"ok": true`.
+
+#### ب) لماذا ظهر «مفتاح Gemini غير مضبوط» رغم إضافته، والحل
+
+السبب: **المعاينات لا ترث أسرار الإنتاج**. إضافة المفتاح في إعدادات الـ Worker (بيئة الإنتاج) لا تصل إلى نشر المعاينة التي لها أسرارها المستقلة، ونشر المعاينة الموجود يحتفظ بإعداداته لحظة إنشائه (إضافة السر لاحقًا لا تغيّر معاينةً قائمة). اضبط المفتاح في الموضعين:
+
+- **الإنتاج** (يخدم hujjah.maaoun.com):
+  ```bash
+  npx wrangler secret put GEMINI_API_KEY
+  ```
+  أو: Cloudflare → Workers & Pages → `qaf` → Settings → Variables and Secrets → Add → نوعه **Secret** → الاسم `GEMINI_API_KEY`.
+- **المعاينة** (روابط workers.dev المؤقتة)، أيّ واحدة من هذه الطرق:
+  ```bash
+  npx wrangler preview base-config secret put GEMINI_API_KEY   # مشترك لكل المعاينات — الأفضل
+  npx wrangler preview secret put GEMINI_API_KEY               # لمعاينة الفرع الحالي فقط
+  ```
+  أو أضِف `GEMINI_API_KEY` في **متغيرات البناء** (Build variables) في إعدادات Workers Builds؛ فسكربت `scripts/prepare-preview.mjs` يحقنه وقت البناء داخل `previews.vars`. ثم **أنشئ نشر معاينة جديدًا** (إعادة بناء أو push جديد) — المعاينة القديمة لن تلتقط المفتاح بأثر رجعي.
+
+للتحقق من أي نشر: افتح ‎`/api/health` عليه وتأكد من `"ai": { "configured": true }`.
+
+لا تضع المفتاح داخل `wrangler.jsonc` في Git، ولا في أي ملف يُتتبَّع. لا حاجة إلى قاعدة بيانات أو Supabase في النسخة الحالية.
 
 **النطاق المقصود لهذا المشروع هو النطاق الفرعي فقط:**
 
@@ -103,7 +134,7 @@ npm run deploy   # يبني وينشر Worker باسم qaf
 hujjah.maaoun.com
 ```
 
-- من Cloudflare Workers → `qaf` → Settings → Domains & Routes، أضف `hujjah.maaoun.com` كـ **Custom Domain**. ينشئ Cloudflare سجل DNS والشهادة تلقائيًا عندما تكون zone `maaoun.com` في الحساب نفسه.
+- يُربط النطاق تلقائيًا عبر قسم `routes` في `wrangler.jsonc` عند كل نشر إنتاجي، و`previews_enabled: false` تمنع المعاينات من المطالبة به.
 - لا تضف `maaoun.com` أو `www.maaoun.com` كـ Custom Domain أو Worker Route لهذا الـ Worker، ولا تنشئ إعادة توجيه منهما إلى حُجَّة.
 - اسم الـ Worker الداخلي هو `qaf`، وقيمة `WORKER_SELF_REFERENCE` في `wrangler.jsonc` هي `qaf` كذلك؛ لا تغيّر أحدهما دون الآخر.
 - `metadataBase` و Open Graph و`canonical` مضبوطة على `https://hujjah.maaoun.com`، كما أن عنوان ووصف SEO والكلمات المفتاحية مضبوطة في `src/app/layout.tsx`.
