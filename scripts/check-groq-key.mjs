@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * فحص مفتاح Gemini في ثوانٍ.
+ * فحص مفتاح Groq في ثوانٍ.
  *
- *   npm run check:gemini
+ *   npm run check:groq
  *       يقرأ المفتاح من البيئة أو من .env / .env.local / .dev.vars
- *       ويختبره مباشرة لدى Google (بلا استهلاك يُذكر).
+ *       ويختبره مباشرة لدى Groq (بلا استهلاك يُذكر).
  *
- *   npm run check:gemini -- https://hujjah.maaoun.com
+ *   npm run check:groq -- https://hujjah.maaoun.com
  *       يفحص نسخة منشورة عبر /api/health?probe=1 ويشرح النتيجة.
  */
 import fs from 'node:fs';
@@ -15,16 +15,10 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-const KEY_NAMES = [
-  'GEMINI_API_KEY',
-  'GOOGLE_API_KEY',
-  'GOOGLE_GENERATIVE_AI_API_KEY',
-  'GOOGLE_AI_API_KEY',
-  'GEMINI_API_KEY_BUILD',
-];
+const KEY_NAMES = ['GROQ_API_KEY', 'GROQ_API_KEY_BUILD'];
 
-const DEFAULT_MODEL = 'gemini-2.5-flash';
-const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
+const DEFAULT_MODEL = 'openai/gpt-oss-120b';
+const BASE_URL = 'https://api.groq.com/openai/v1';
 
 function cleanSecret(value) {
   if (typeof value !== 'string') return '';
@@ -89,18 +83,18 @@ async function checkRemote(target) {
   if (!key.found) {
     console.error('❌ الخادم لا يرى المفتاح إطلاقًا.');
     console.error('   الحل: Workers → qaf → Settings → Variables and Secrets →');
-    console.error('   Add → Type: Secret → Name: GEMINI_API_KEY → Deploy.');
+    console.error('   Add → Type: Secret → Name: GROQ_API_KEY → Deploy.');
     console.error('   تذكير: «Build variables» لا تصل إلى وقت التشغيل.');
     process.exit(1);
   }
 
   console.log(`✅ المفتاح مقروء من ${key.variable} عبر ${key.source} (${key.length} حرفًا).`);
 
-  const ping = data.probe?.gemini;
+  const ping = data.probe?.groq;
   if (ping?.ok) {
-    console.log(`✅ Google قبل المفتاح والنموذج ${data.ai?.model} متاح (${ping.tookMs}ms).`);
+    console.log(`✅ Groq قبل المفتاح والنموذج ${data.ai?.model} متاح (${ping.tookMs}ms).`);
   } else {
-    console.error(`❌ فشل فحص Gemini: [${ping?.code}] ${ping?.message}`);
+    console.error(`❌ فشل فحص Groq: [${ping?.code}] ${ping?.message}`);
     process.exit(1);
   }
 
@@ -113,27 +107,27 @@ async function checkRemote(target) {
 }
 
 async function checkLocal() {
-  const model = cleanSecret(process.env.GEMINI_MODEL) || DEFAULT_MODEL;
+  const model = cleanSecret(process.env.GROQ_MODEL) || DEFAULT_MODEL;
   const key = resolveKey();
 
   if (!key) {
     console.error('❌ لم يُعثر على مفتاح في البيئة ولا في .env / .env.local / .dev.vars');
     console.error(`   الأسماء المقبولة: ${KEY_NAMES.join('، ')}`);
-    console.error('   محليًا: ضع GEMINI_API_KEY=... في .env.local');
+    console.error('   محليًا: ضع GROQ_API_KEY=... في .env.local');
     process.exit(1);
   }
 
   console.log(`🔑 المفتاح: ${key.name} من ${key.from} — ${key.value.length} حرفًا.`);
-  if (!/^AIza[0-9A-Za-z_-]{30,}$/.test(key.value)) {
-    console.warn('⚠ شكل المفتاح غير معتاد (المتوقّع يبدأ بـ AIza). تحقّق من النسخ.');
+  if (!/^gsk_[0-9A-Za-z_-]{20,}$/.test(key.value)) {
+    console.warn('⚠ شكل المفتاح غير معتاد (المتوقّع يبدأ بـ gsk_). تحقّق من النسخ.');
   }
 
   const t0 = Date.now();
   const res = await fetch(`${BASE_URL}/models/${encodeURIComponent(model)}`, {
-    headers: { 'x-goog-api-key': key.value },
+    headers: { Authorization: `Bearer ${key.value}` },
     cache: 'no-store',
   }).catch((e) => {
-    console.error(`❌ تعذّر الاتصال بـ Google: ${e.message}`);
+    console.error(`❌ تعذّر الاتصال بـ Groq: ${e.message}`);
     process.exit(1);
   });
 
@@ -141,18 +135,17 @@ async function checkLocal() {
 
   if (res.ok) {
     console.log(`✅ المفتاح صالح والنموذج «${model}» متاح (${Date.now() - t0}ms).`);
-    console.log(`   حدود النموذج: إدخال ${body.inputTokenLimit ?? '؟'} / إخراج ${body.outputTokenLimit ?? '؟'} رمزًا.`);
+    console.log(`   نافذة السياق: ${body.context_window ?? '؟'} رمزًا.`);
     return;
   }
 
   const detail = body?.error?.message ?? '';
   if (res.status === 404) {
-    console.error(`❌ النموذج «${model}» غير متاح لهذا المفتاح. جرّب GEMINI_MODEL=gemini-2.5-flash`);
+    console.error(`❌ النموذج «${model}» غير متاح لهذا المفتاح. جرّب GROQ_MODEL=openai/gpt-oss-120b`);
   } else if (res.status === 429) {
     console.error('❌ تجاوز حدّ الاستخدام مؤقتًا؛ أعد المحاولة لاحقًا.');
   } else if (res.status === 401 || res.status === 403 || /api key/i.test(detail)) {
-    console.error('❌ Google رفض المفتاح. تأكّد أنه من https://aistudio.google.com/apikey');
-    console.error('   وأنّ قيود المفتاح (HTTP referrers / IP) لا تمنع الاستدعاء من الخادم.');
+    console.error('❌ Groq رفض المفتاح. تأكّد أنه من https://console.groq.com/keys');
   } else {
     console.error(`❌ خطأ (${res.status}): ${detail.slice(0, 300)}`);
   }

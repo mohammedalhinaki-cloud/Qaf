@@ -5,7 +5,7 @@
  * على Cloudflare Workers (OpenNext) لا تكون الأسرار جاهزة أثناء تقييم الوحدات
  * (module scope)؛ فهي تُحقن في `process.env` عند أول طلب فقط، كما تتوفّر دائمًا
  * داخل «سياق Cloudflare». أي قراءة مبكّرة تُنتج قيمة فارغة تبقى فارغة إلى الأبد،
- * وهذا سبب شائع جدًا لرسالة «مفتاح Gemini غير مضبوط» رغم ضبط السر في اللوحة.
+ * وهذا سبب شائع جدًا لرسالة «مفتاح Groq غير مضبوط» رغم ضبط السر في اللوحة.
  *
  * لذلك: كل قراءة هنا تحدث عند الاستعمال، ومن مصدرين معًا:
  *   1) process.env            (nodejs_compat / next dev / Node)
@@ -74,7 +74,7 @@ export function cleanValue(raw: unknown): string {
  * تنظيف سرّ (مفتاح API). يعالج أشهر أخطاء اللصق:
  *   - مسافات أو سطر جديد في الطرفين أو الوسط
  *   - اقتباسات محيطة
- *   - لصق السطر كاملًا: `GEMINI_API_KEY=AIza...`
+ *   - لصق السطر كاملًا: `GROQ_API_KEY=gsk_...`
  */
 export function cleanSecret(raw: unknown): string {
   let value = cleanValue(raw);
@@ -83,7 +83,7 @@ export function cleanSecret(raw: unknown): string {
   const pasted = /^[A-Za-z_][A-Za-z0-9_]*\s*=\s*(.+)$/s.exec(value);
   if (pasted) value = cleanValue(pasted[1]);
 
-  // مفاتيح Google لا تحتوي أي فراغ؛ أي فراغ هنا خطأ لصق.
+  // مفاتيح Groq لا تحتوي أي فراغ؛ أي فراغ هنا خطأ لصق.
   return value.replace(/\s+/gu, '');
 }
 
@@ -125,24 +125,18 @@ export function envInt(name: string, fallback: number): number {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
-/* ———————————————— مفتاح Gemini ———————————————— */
+/* ———————————————— مفتاح Groq ———————————————— */
 
 /**
- * أسماء مقبولة للمفتاح. `GEMINI_API_KEY` هو الاسم الرسمي، والبقية للتوافق مع
- * منصات النشر المختلفة. `GEMINI_API_KEY_BUILD` آخر الاحتياطات: يُحقن من بيئة
- * البناء (Workers Builds) حين لا يوجد سرّ وقت تشغيل، ولا يطغى أبدًا على السرّ.
+ * أسماء مقبولة للمفتاح. `GROQ_API_KEY` هو الاسم الرسمي الوحيد.
+ * `GROQ_API_KEY_BUILD` آخر الاحتياطات: يُحقن من بيئة البناء (Workers Builds)
+ * حين لا يوجد سرّ وقت تشغيل، ولا يطغى أبدًا على السرّ.
  */
-export const GEMINI_KEY_NAMES = [
-  'GEMINI_API_KEY',
-  'GOOGLE_API_KEY',
-  'GOOGLE_GENERATIVE_AI_API_KEY',
-  'GOOGLE_AI_API_KEY',
-  'GEMINI_API_KEY_BUILD',
-] as const;
+export const GROQ_KEY_NAMES = ['GROQ_API_KEY', 'GROQ_API_KEY_BUILD'] as const;
 
-/** يحلّ مفتاح Gemini عند الطلب. يعيد null إن لم يوجد في أي مصدر. */
-export function resolveGeminiKey(): EnvHit | null {
-  return lookupEnv(GEMINI_KEY_NAMES, true);
+/** يحلّ مفتاح Groq عند الطلب. يعيد null إن لم يوجد في أي مصدر. */
+export function resolveGroqKey(): EnvHit | null {
+  return lookupEnv(GROQ_KEY_NAMES, true);
 }
 
 export interface KeyDiagnostics {
@@ -151,8 +145,8 @@ export interface KeyDiagnostics {
   name: string | null;
   source: EnvSource | null;
   length: number;
-  /** هل يشبه شكل مفاتيح Google AI Studio (AIza…)؟ */
-  looksLikeGoogleKey: boolean;
+  /** هل يشبه شكل مفاتيح Groq (gsk_…)؟ */
+  looksLikeGroqKey: boolean;
   /** الأسماء التي بحثنا عنها، لتسهيل التشخيص */
   checkedNames: string[];
   onCloudflare: boolean;
@@ -160,10 +154,10 @@ export interface KeyDiagnostics {
 }
 
 /** تشخيص آمن للمفتاح: لا يكشف القيمة إطلاقًا، فقط ما يكفي لمعرفة سبب العطل. */
-export function geminiKeyDiagnostics(): KeyDiagnostics {
-  const hit = resolveGeminiKey();
+export function groqKeyDiagnostics(): KeyDiagnostics {
+  const hit = resolveGroqKey();
   const base = {
-    checkedNames: [...GEMINI_KEY_NAMES],
+    checkedNames: [...GROQ_KEY_NAMES],
     onCloudflare: onCloudflareWorker(),
   };
 
@@ -174,16 +168,16 @@ export function geminiKeyDiagnostics(): KeyDiagnostics {
       name: null,
       source: null,
       length: 0,
-      looksLikeGoogleKey: false,
+      looksLikeGroqKey: false,
       hint:
         'لم يُعثر على المفتاح في أي مصدر. على Cloudflare: Workers → qaf → Settings → ' +
-        'Variables and Secrets → Add → نوع Secret باسم GEMINI_API_KEY ثم Deploy. ' +
+        'Variables and Secrets → Add → نوع Secret باسم GROQ_API_KEY ثم Deploy. ' +
         'انتبه: متغيّرات «Build» لا تصل إلى وقت التشغيل.',
     };
   }
 
-  const looksLikeGoogleKey = /^AIza[0-9A-Za-z_-]{30,}$/.test(hit.value);
-  const suspiciousLength = hit.value.length < 30 || hit.value.length > 120;
+  const looksLikeGroqKey = /^gsk_[0-9A-Za-z_-]{20,}$/.test(hit.value);
+  const suspiciousLength = hit.value.length < 20 || hit.value.length > 200;
 
   return {
     ...base,
@@ -191,11 +185,11 @@ export function geminiKeyDiagnostics(): KeyDiagnostics {
     name: hit.name,
     source: hit.source,
     length: hit.value.length,
-    looksLikeGoogleKey,
-    hint: looksLikeGoogleKey
+    looksLikeGroqKey,
+    hint: looksLikeGroqKey
       ? 'المفتاح موجود وشكله سليم.'
       : suspiciousLength
         ? 'المفتاح موجود لكن طوله غير معتاد؛ تأكّد أنك نسخت المفتاح كاملًا بلا مسافات.'
-        : 'المفتاح موجود لكنه لا يبدأ بـ AIza؛ تأكّد أنه مفتاح Google AI Studio وليس مفتاحًا آخر.',
+        : 'المفتاح موجود لكنه لا يبدأ بـ gsk_؛ تأكّد أنه مفتاح Groq من console.groq.com وليس مفتاحًا آخر.',
   };
 }
