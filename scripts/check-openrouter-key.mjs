@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * فحص مفتاح Groq في ثوانٍ.
+ * فحص مفتاح OpenRouter في ثوانٍ.
  *
- *   npm run check:groq
+ *   npm run check:openrouter
  *       يقرأ المفتاح من البيئة أو من .env / .env.local / .dev.vars
- *       ويختبره مباشرة لدى Groq (بلا استهلاك يُذكر).
+ *       ويختبره مباشرة لدى OpenRouter (بلا استهلاك يُذكر).
  *
- *   npm run check:groq -- https://hujjah.maaoun.com
+ *   npm run check:openrouter -- https://hujjah.maaoun.com
  *       يفحص نسخة منشورة عبر /api/health?probe=1 ويشرح النتيجة.
  */
 import fs from 'node:fs';
@@ -15,10 +15,10 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-const KEY_NAMES = ['GROQ_API_KEY', 'GROQ_API_KEY_BUILD'];
+const KEY_NAMES = ['TUA', 'TUA_BUILD'];
 
 const DEFAULT_MODEL = 'openai/gpt-oss-120b';
-const BASE_URL = 'https://api.groq.com/openai/v1';
+const BASE_URL = 'https://openrouter.ai/api/v1';
 
 function cleanSecret(value) {
   if (typeof value !== 'string') return '';
@@ -83,18 +83,18 @@ async function checkRemote(target) {
   if (!key.found) {
     console.error('❌ الخادم لا يرى المفتاح إطلاقًا.');
     console.error('   الحل: Workers → qaf → Settings → Variables and Secrets →');
-    console.error('   Add → Type: Secret → Name: GROQ_API_KEY → Deploy.');
+    console.error('   Add → Type: Secret → Name: TUA → Deploy.');
     console.error('   تذكير: «Build variables» لا تصل إلى وقت التشغيل.');
     process.exit(1);
   }
 
   console.log(`✅ المفتاح مقروء من ${key.variable} عبر ${key.source} (${key.length} حرفًا).`);
 
-  const ping = data.probe?.groq;
+  const ping = data.probe?.openrouter;
   if (ping?.ok) {
-    console.log(`✅ Groq قبل المفتاح والنموذج ${data.ai?.model} متاح (${ping.tookMs}ms).`);
+    console.log(`✅ OpenRouter قبل المفتاح والنموذج ${data.ai?.model} متاح (${ping.tookMs}ms).`);
   } else {
-    console.error(`❌ فشل فحص Groq: [${ping?.code}] ${ping?.message}`);
+    console.error(`❌ فشل فحص OpenRouter: [${ping?.code}] ${ping?.message}`);
     process.exit(1);
   }
 
@@ -107,19 +107,19 @@ async function checkRemote(target) {
 }
 
 async function checkLocal() {
-  const model = cleanSecret(process.env.GROQ_MODEL) || DEFAULT_MODEL;
+  const model = cleanSecret(process.env.TUA_MODEL) || DEFAULT_MODEL;
   const key = resolveKey();
 
   if (!key) {
     console.error('❌ لم يُعثر على مفتاح في البيئة ولا في .env / .env.local / .dev.vars');
     console.error(`   الأسماء المقبولة: ${KEY_NAMES.join('، ')}`);
-    console.error('   محليًا: ضع GROQ_API_KEY=... في .env.local');
+    console.error('   محليًا: ضع TUA=... في .env.local');
     process.exit(1);
   }
 
   console.log(`🔑 المفتاح: ${key.name} من ${key.from} — ${key.value.length} حرفًا.`);
-  if (!/^gsk_[0-9A-Za-z_-]{20,}$/.test(key.value)) {
-    console.warn('⚠ شكل المفتاح غير معتاد (المتوقّع يبدأ بـ gsk_). تحقّق من النسخ.');
+  if (!/^sk-or-v1-[0-9A-Za-z_-]{20,}$/.test(key.value)) {
+    console.warn('⚠ شكل المفتاح غير معتاد (المتوقّع يبدأ بـ sk-or-v1-). تحقّق من النسخ.');
   }
 
   const t0 = Date.now();
@@ -127,7 +127,7 @@ async function checkLocal() {
     headers: { Authorization: `Bearer ${key.value}` },
     cache: 'no-store',
   }).catch((e) => {
-    console.error(`❌ تعذّر الاتصال بـ Groq: ${e.message}`);
+    console.error(`❌ تعذّر الاتصال بـ OpenRouter: ${e.message}`);
     process.exit(1);
   });
 
@@ -141,11 +141,11 @@ async function checkLocal() {
 
   const detail = body?.error?.message ?? '';
   if (res.status === 404) {
-    console.error(`❌ النموذج «${model}» غير متاح لهذا المفتاح. جرّب GROQ_MODEL=openai/gpt-oss-120b`);
+    console.error(`❌ النموذج «${model}» غير متاح لهذا المفتاح. جرّب TUA_MODEL=openai/gpt-oss-120b`);
   } else if (res.status === 429) {
     console.error('❌ تجاوز حدّ الاستخدام مؤقتًا؛ أعد المحاولة لاحقًا.');
   } else if (res.status === 401 || res.status === 403 || /api key/i.test(detail)) {
-    console.error('❌ Groq رفض المفتاح. تأكّد أنه من https://console.groq.com/keys');
+    console.error('❌ OpenRouter رفض المفتاح. تأكّد أنه من https://openrouter.ai/keys');
   } else {
     console.error(`❌ خطأ (${res.status}): ${detail.slice(0, 300)}`);
   }

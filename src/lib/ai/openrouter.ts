@@ -1,17 +1,17 @@
 import { config } from '@/lib/config';
-import { resolveGroqKey } from '@/lib/env';
+import { resolveOpenRouterKey } from '@/lib/env';
 
 /**
- * عميل Groq عبر واجهة REST المتوافقة مع OpenAI (chat/completions).
+ * عميل OpenRouter عبر واجهة REST المتوافقة مع OpenAI (chat/completions).
  * المفتاح يُقرأ من البيئة على الخادم فقط — لحظة الطلب لا عند تحميل الوحدة —
  * ولا يُرسل إلى المتصفح ولا يُسجَّل في أي مكان.
  *
  * طبقة التطبيع (Adapter): بقية التطبيق تستدعي `generateJson<T>` وتستلم
  * كائن JSON مُحلَّلًا بنفس الصيغة التي كانت تتوقعها سابقًا، بغضّ النظر عن
- * شكل استجابة Groq الداخلي (choices/message/content).
+ * شكل استجابة OpenRouter الداخلي (choices/message/content).
  */
 
-export type GroqErrorCode =
+export type OpenRouterErrorCode =
   | 'missing_key'
   | 'auth'
   | 'rate_limit'
@@ -26,18 +26,18 @@ export type GroqErrorCode =
 // ملاحظة: نتجنّب خصائص المُنشئ المختصرة (parameter properties) هنا عمدًا؛
 // وضع التجريد الخالص للأنواع (type-stripping، مثل --experimental-strip-types
 // في Node) لا يدعم هذه الصياغة، وهذا يكسر تحميل الوحدة وقت الاختبار.
-export class GroqError extends Error {
-  public readonly code: GroqErrorCode;
+export class OpenRouterError extends Error {
+  public readonly code: OpenRouterErrorCode;
 
-  constructor(message: string, code: GroqErrorCode) {
+  constructor(message: string, code: OpenRouterErrorCode) {
     super(message);
-    this.name = 'GroqError';
+    this.name = 'OpenRouterError';
     this.code = code;
   }
 }
 
-export function isGroqConfigured(): boolean {
-  return resolveGroqKey() !== null;
+export function isOpenRouterConfigured(): boolean {
+  return resolveOpenRouterKey() !== null;
 }
 
 interface GenerateOptions {
@@ -50,8 +50,8 @@ interface GenerateOptions {
   signal?: AbortSignal;
 }
 
-/** صيغة استجابة Groq (متوافقة مع OpenAI chat/completions). */
-interface GroqResponse {
+/** صيغة استجابة OpenRouter (متوافقة مع OpenAI chat/completions). */
+interface OpenRouterResponse {
   choices?: Array<{
     message?: { content?: string | null; refusal?: string | null };
     finish_reason?: string;
@@ -65,15 +65,15 @@ function scrub(message: string, key: string): string {
   if (key) out = out.split(key).join('«مفتاح محجوب»');
   return out
     .replace(/Bearer\s+[\w-]+/gi, 'Bearer «محجوب»')
-    .replace(/gsk_[\w-]+/gi, 'gsk_«محجوب»')
+    .replace(/sk-or-v1-[\w-]+/gi, 'sk-or-v1-«محجوب»')
     .slice(0, 400);
 }
 
 function requireKey(): string {
-  const hit = resolveGroqKey();
+  const hit = resolveOpenRouterKey();
   if (!hit) {
-    throw new GroqError(
-      'مفتاح Groq غير مضبوط على الخادم. أضف GROQ_API_KEY في متغيّرات البيئة (Secret) ثم أعد النشر.',
+    throw new OpenRouterError(
+      'مفتاح OpenRouter غير مضبوط على الخادم. أضف TUA في متغيّرات البيئة (Secret) ثم أعد النشر.',
       'missing_key',
     );
   }
@@ -109,12 +109,12 @@ function isModelUnavailable(result: RawResult): boolean {
 interface RawResult {
   ok: boolean;
   status: number;
-  data: GroqResponse;
+  data: OpenRouterResponse;
   detail: string;
 }
 
 /* ———————————————— إعادة المحاولة عند الازدحام المؤقت ————————————————
- * Groq يعيد أحيانًا 503 «Service Unavailable» أو 500/502/504 بسبب ضغط
+ * OpenRouter يعيد أحيانًا 503 «Service Unavailable» أو 500/502/504 بسبب ضغط
  * مؤقت على الخوادم، وهذه حالات عابرة تُحلّ عادة خلال ثوانٍ. بدل فشل
  * الطلب فورًا ونزولنا إلى عرض المقاطع الخام بلا صياغة، نعيد المحاولة
  * تلقائيًا عدّة مرّات مع تأخير متصاعد (exponential backoff) ضمن مهلة
@@ -131,7 +131,7 @@ function isOverloadedMessage(detail: string): boolean {
 
 function isRetryableResult(result: RawResult): boolean {
   if (result.ok) return false;
-  // status === 0 يعني خطأ اتصال عابر (انظر callGroq).
+  // status === 0 يعني خطأ اتصال عابر (انظر callOpenRouter).
   return result.status === 0 || RETRYABLE_STATUS.has(result.status) || isOverloadedMessage(result.detail);
 }
 
@@ -151,19 +151,19 @@ function delay(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
-/** يستدعي Groq مع إعادة محاولات تلقائية عند 503/ازدحام مؤقت. */
-async function callGroqWithRetry(
+/** يستدعي OpenRouter مع إعادة محاولات تلقائية عند 503/ازدحام مؤقت. */
+async function callOpenRouterWithRetry(
   key: string,
   body: Record<string, unknown>,
   signal: AbortSignal,
 ): Promise<RawResult> {
-  let result = await callGroq(key, body, signal);
+  let result = await callOpenRouter(key, body, signal);
   let attempt = 1;
 
   while (isRetryableResult(result) && attempt < MAX_ATTEMPTS && !signal.aborted) {
     await delay(RETRY_DELAYS_MS[Math.min(attempt - 1, RETRY_DELAYS_MS.length - 1)], signal);
     if (signal.aborted) break;
-    result = await callGroq(key, body, signal);
+    result = await callOpenRouter(key, body, signal);
     attempt += 1;
   }
 
@@ -171,8 +171,8 @@ async function callGroqWithRetry(
 }
 
 /* ———————————————— اكتشاف نموذج بديل تلقائيًا ————————————————
- * Groq يوقف نماذج قديمة من حين لآخر (model_decommissioned)، وبعض المفاتيح
- * قد لا تتاح لها كل النماذج. عند تعذّر النموذج المضبوط، نسأل Groq عن
+ * OpenRouter يوقف نماذج قديمة من حين لآخر (model_decommissioned)، وبعض المفاتيح
+ * قد لا تتاح لها كل النماذج. عند تعذّر النموذج المضبوط، نسأل OpenRouter عن
  * النماذج المتاحة فعلًا لهذا المفتاح ونختار أفضل بديل، ثم نحفظه في
  * الذاكرة كي لا نكرّر الاستعلام.
  */
@@ -196,14 +196,14 @@ const UNSUITABLE_MODEL = /whisper|tts|guard|moderation|embedding|compound|safety
 let modelCache: { fingerprint: string; model: string } | null = null;
 
 function cacheFingerprint(key: string): string {
-  return `${config.groq.baseUrl}|${config.groq.model}|${key.slice(-6)}`;
+  return `${config.openrouter.baseUrl}|${config.openrouter.model}|${key.slice(-6)}`;
 }
 
 /** النموذج الفعلي المستعمل: المضبوط، أو البديل المكتشف سابقًا لهذا المفتاح. */
 function activeModel(key: string): string {
   return modelCache && modelCache.fingerprint === cacheFingerprint(key)
     ? modelCache.model
-    : config.groq.model;
+    : config.openrouter.model;
 }
 
 interface ListedModel {
@@ -211,10 +211,10 @@ interface ListedModel {
   active?: boolean;
 }
 
-/** يسأل Groq عن النماذج المتاحة لهذا المفتاح ويعيد معرّفاتها. */
+/** يسأل OpenRouter عن النماذج المتاحة لهذا المفتاح ويعيد معرّفاتها. */
 async function listAvailableModels(key: string, signal?: AbortSignal): Promise<string[]> {
   try {
-    const res = await fetch(`${config.groq.baseUrl}/models`, {
+    const res = await fetch(`${config.openrouter.baseUrl}/models`, {
       headers: { Authorization: `Bearer ${key}` },
       signal: signal ?? AbortSignal.timeout(10_000),
       cache: 'no-store',
@@ -247,22 +247,22 @@ function pickFallback(available: string[], exclude: string): string | null {
  */
 async function discoverFallbackModel(key: string, signal?: AbortSignal): Promise<string | null> {
   const available = await listAvailableModels(key, signal);
-  const fallback = pickFallback(available, config.groq.model);
+  const fallback = pickFallback(available, config.openrouter.model);
   if (fallback) {
     modelCache = { fingerprint: cacheFingerprint(key), model: fallback };
     console.warn(
-      `[groq] النموذج «${config.groq.model}» غير متاح لهذا المفتاح؛ تم التحويل تلقائيًا إلى «${fallback}».`,
+      `[openrouter] النموذج «${config.openrouter.model}» غير متاح لهذا المفتاح؛ تم التحويل تلقائيًا إلى «${fallback}».`,
     );
   }
   return fallback;
 }
 
-async function callGroq(
+async function callOpenRouter(
   key: string,
   body: Record<string, unknown>,
   signal: AbortSignal,
 ): Promise<RawResult> {
-  const url = `${config.groq.baseUrl}/chat/completions`;
+  const url = `${config.openrouter.baseUrl}/chat/completions`;
 
   let res: Response;
   try {
@@ -279,16 +279,16 @@ async function callGroq(
   } catch (e) {
     const name = e instanceof Error ? e.name : '';
     if (name === 'TimeoutError' || name === 'AbortError') {
-      throw new GroqError('انتهت مهلة الاتصال بنموذج Groq.', 'timeout');
+      throw new OpenRouterError('انتهت مهلة الاتصال بنموذج OpenRouter.', 'timeout');
     }
     // خطأ اتصال عابر (شبكة/DNS/إعادة تعيين): نرجعه كنتيجة لا كاستثناء كي
     // تلتقطه حلقة إعادة المحاولة بدل إفشال الطلب من أول عثرة.
-    return { ok: false, status: 0, data: {}, detail: 'تعذّر الاتصال بنموذج Groq.' };
+    return { ok: false, status: 0, data: {}, detail: 'تعذّر الاتصال بنموذج OpenRouter.' };
   }
 
-  let data: GroqResponse = {};
+  let data: OpenRouterResponse = {};
   try {
-    data = (await res.json()) as GroqResponse;
+    data = (await res.json()) as OpenRouterResponse;
   } catch {
     /* استجابة بلا JSON */
   }
@@ -307,7 +307,7 @@ function supportsReasoningEffort(model: string): boolean {
 
 /**
  * يبني جسم طلب chat/completions.
- * عند json_schema: نسلّم المخطط لـ Groq للمخرجات المهيكلة.
+ * عند json_schema: نسلّم المخطط لـ OpenRouter للمخرجات المهيكلة.
  * عند json_object (نماذج لا تدعم المخطط): نضمّن المخطط نصًا في التعليمات
  * ليبقى شكل المخرجات مطابقًا لما تتوقعه بقية أجزاء التطبيق.
  */
@@ -335,7 +335,7 @@ function buildBody(opts: GenerateOptions, model: string, mode: JsonMode): Record
 
   // تقليل «التفكير» على النماذج الاستدلالية كي لا يُستهلك حدّ المخرجات قبل
   // إنتاج JSON (يقابل تعطيل thinkingBudget سابقًا).
-  const effort = config.groq.reasoningEffort;
+  const effort = config.openrouter.reasoningEffort;
   if (effort !== null && supportsReasoningEffort(model)) {
     body.reasoning_effort = effort;
   }
@@ -351,79 +351,79 @@ export async function generateJson<T>(opts: GenerateOptions): Promise<T> {
 
   let model = activeModel(key);
   let mode: JsonMode = opts.schema ? 'json_schema' : 'json_object';
-  let result = await callGroqWithRetry(key, buildBody(opts, model, mode), signal);
+  let result = await callOpenRouterWithRetry(key, buildBody(opts, model, mode), signal);
 
   // النموذج المضبوط غير متاح (أُوقف أو غير متاح لهذا المفتاح): نكتشف بديلًا.
   if (isModelUnavailable(result)) {
     const fallback = await discoverFallbackModel(key, signal);
     if (fallback && fallback !== model) {
       model = fallback;
-      result = await callGroqWithRetry(key, buildBody(opts, model, mode), signal);
+      result = await callOpenRouterWithRetry(key, buildBody(opts, model, mode), signal);
     }
   }
 
   // بعض النماذج لا تدعم json_schema: نعيد المحاولة بوضع json_object.
   if (!result.ok && result.status === 400 && mode === 'json_schema' && isSchemaUnsupported(result.detail)) {
     mode = 'json_object';
-    result = await callGroqWithRetry(key, buildBody(opts, model, mode), signal);
+    result = await callOpenRouterWithRetry(key, buildBody(opts, model, mode), signal);
   }
 
   // بعض النماذج لا تقبل reasoning_effort: نعيد المحاولة مرة واحدة بدونه.
   if (!result.ok && result.status === 400 && isReasoningUnsupported(result.detail)) {
     const body = buildBody(opts, model, mode);
     delete body.reasoning_effort;
-    result = await callGroqWithRetry(key, body, signal);
+    result = await callOpenRouterWithRetry(key, body, signal);
   }
 
   const { ok, status, data, detail } = result;
 
   if (status === 401 || status === 403 || (status === 400 && isInvalidKeyMessage(detail))) {
-    throw new GroqError(
-      'مفتاح Groq مرفوض (غير صالح أو مقيَّد أو منتهي الصلاحية). تحقّق من GROQ_API_KEY.',
+    throw new OpenRouterError(
+      'مفتاح OpenRouter مرفوض (غير صالح أو مقيَّد أو منتهي الصلاحية). تحقّق من TUA.',
       'auth',
     );
   }
   if (status === 429) {
-    throw new GroqError('تم تجاوز حدّ الاستخدام لدى Groq. حاول بعد قليل.', 'rate_limit');
+    throw new OpenRouterError('تم تجاوز حدّ الاستخدام لدى OpenRouter. حاول بعد قليل.', 'rate_limit');
   }
   if (isModelUnavailable(result)) {
-    throw new GroqError(
-      `النموذج «${config.groq.model}» غير متاح لهذا المفتاح، ولم يُعثر على أي نموذج بديل متاح له. تحقّق من المفتاح أو غيّر GROQ_MODEL.`,
+    throw new OpenRouterError(
+      `النموذج «${config.openrouter.model}» غير متاح لهذا المفتاح، ولم يُعثر على أي نموذج بديل متاح له. تحقّق من المفتاح أو غيّر TUA_MODEL.`,
       'model_not_found',
     );
   }
   if (!ok && status === 0) {
-    throw new GroqError(
-      'تعذّر الاتصال بنموذج Groq بعد عدّة محاولات تلقائية. تحقّق من الاتصال وحاول مرة أخرى.',
+    throw new OpenRouterError(
+      'تعذّر الاتصال بنموذج OpenRouter بعد عدّة محاولات تلقائية. تحقّق من الاتصال وحاول مرة أخرى.',
       'upstream',
     );
   }
   if (!ok && (RETRYABLE_STATUS.has(status) || isOverloadedMessage(detail))) {
-    throw new GroqError(
-      'نموذج Groq مزدحم حاليًا (ضغط مرتفع على الخوادم). تمت إعادة المحاولة عدّة مرّات تلقائيًا دون نجاح، فحاول مرة أخرى خلال لحظات.',
+    throw new OpenRouterError(
+      'نموذج OpenRouter مزدحم حاليًا (ضغط مرتفع على الخوادم). تمت إعادة المحاولة عدّة مرّات تلقائيًا دون نجاح، فحاول مرة أخرى خلال لحظات.',
       'overloaded',
     );
   }
   if (!ok) {
-    throw new GroqError(scrub(`خطأ من Groq (${status}) ${detail}`.trim(), key), 'upstream');
+    throw new OpenRouterError(scrub(`خطأ من OpenRouter (${status}) ${detail}`.trim(), key), 'upstream');
   }
 
   const choice = data.choices?.[0];
 
   if (choice?.message?.refusal) {
-    throw new GroqError('رفض النموذج معالجة هذا الطلب.', 'blocked');
+    throw new OpenRouterError('رفض النموذج معالجة هذا الطلب.', 'blocked');
   }
 
   const text = choice?.message?.content ?? '';
 
   if (!text.trim()) {
     if (choice?.finish_reason === 'length') {
-      throw new GroqError(
+      throw new OpenRouterError(
         'استهلك النموذج حدّ المخرجات قبل إنتاج نص. قلّل حجم الطلب أو ارفع الحدّ.',
         'truncated',
       );
     }
-    throw new GroqError('أعاد النموذج استجابة فارغة.', 'bad_response');
+    throw new OpenRouterError('أعاد النموذج استجابة فارغة.', 'bad_response');
   }
 
   try {
@@ -438,29 +438,29 @@ export async function generateJson<T>(opts: GenerateOptions): Promise<T> {
         /* يسقط للأسفل */
       }
     }
-    throw new GroqError('تعذّر تحليل استجابة النموذج.', 'bad_response');
+    throw new OpenRouterError('تعذّر تحليل استجابة النموذج.', 'bad_response');
   }
 }
 
 /* ———————————————— فحص تشخيصي ———————————————— */
 
-export interface GroqPing {
+export interface OpenRouterPing {
   ok: boolean;
   status: number | null;
-  /** تصنيف مختصر للعطل، مطابق لرموز GroqError */
-  code: GroqError['code'] | null;
+  /** تصنيف مختصر للعطل، مطابق لرموز OpenRouterError */
+  code: OpenRouterError['code'] | null;
   message: string;
   tookMs: number;
 }
 
 /**
- * فحص خفيف للمفتاح: يسأل Groq عن بيانات النموذج فقط (بلا توليد ولا استهلاك).
+ * فحص خفيف للمفتاح: يسأل OpenRouter عن بيانات النموذج فقط (بلا توليد ولا استهلاك).
  * يُستعمل في `/api/health?probe=1` لتمييز «مفتاح مفقود» عن «مفتاح مرفوض»
  * عن «نموذج غير متاح» بدقّة، دون كشف المفتاح.
  */
-export async function pingGroq(): Promise<GroqPing> {
+export async function pingOpenRouter(): Promise<OpenRouterPing> {
   const t0 = Date.now();
-  const hit = resolveGroqKey();
+  const hit = resolveOpenRouterKey();
 
   if (!hit) {
     return {
@@ -473,7 +473,7 @@ export async function pingGroq(): Promise<GroqPing> {
   }
 
   const model = activeModel(hit.value);
-  const url = `${config.groq.baseUrl}/models/${encodeURIComponent(model)}`;
+  const url = `${config.openrouter.baseUrl}/models/${encodeURIComponent(model)}`;
 
   try {
     const res = await fetch(url, {
@@ -490,9 +490,9 @@ export async function pingGroq(): Promise<GroqPing> {
         status: res.status,
         code: null,
         message:
-          model === config.groq.model
+          model === config.openrouter.model
             ? 'المفتاح يعمل والنموذج متاح.'
-            : `المفتاح يعمل. النموذج المضبوط «${config.groq.model}» غير متاح، ويُستعمل بدلًا منه «${model}» تلقائيًا.`,
+            : `المفتاح يعمل. النموذج المضبوط «${config.openrouter.model}» غير متاح، ويُستعمل بدلًا منه «${model}» تلقائيًا.`,
         tookMs,
       };
     }
@@ -505,7 +505,7 @@ export async function pingGroq(): Promise<GroqPing> {
           ok: true,
           status: 200,
           code: null,
-          message: `النموذج «${config.groq.model}» غير متاح لهذا المفتاح؛ سيُستعمل «${fallback}» تلقائيًا.`,
+          message: `النموذج «${config.openrouter.model}» غير متاح لهذا المفتاح؛ سيُستعمل «${fallback}» تلقائيًا.`,
           tookMs: Date.now() - t0,
         };
       }
@@ -513,13 +513,13 @@ export async function pingGroq(): Promise<GroqPing> {
 
     let detail = '';
     try {
-      const j = (await res.json()) as GroqResponse;
+      const j = (await res.json()) as OpenRouterResponse;
       detail = j.error?.message ?? '';
     } catch {
       /* تجاهل */
     }
 
-    const code: GroqError['code'] =
+    const code: OpenRouterError['code'] =
       res.status === 404
         ? 'model_not_found'
         : res.status === 429
@@ -530,9 +530,9 @@ export async function pingGroq(): Promise<GroqPing> {
 
     const message =
       code === 'auth'
-        ? 'المفتاح موجود لكن Groq رفضه (غير صالح أو مقيَّد أو منتهي الصلاحية).'
+        ? 'المفتاح موجود لكن OpenRouter رفضه (غير صالح أو مقيَّد أو منتهي الصلاحية).'
         : code === 'model_not_found'
-          ? `النموذج «${config.groq.model}» غير متاح لهذا المفتاح، ولا يوجد بديل متاح له.`
+          ? `النموذج «${config.openrouter.model}» غير متاح لهذا المفتاح، ولا يوجد بديل متاح له.`
           : code === 'rate_limit'
             ? 'تم تجاوز حدّ الاستخدام مؤقتًا.'
             : scrub(detail || `استجابة غير متوقّعة (${res.status}).`, hit.value);
@@ -545,7 +545,7 @@ export async function pingGroq(): Promise<GroqPing> {
       ok: false,
       status: null,
       code: timedOut ? 'timeout' : 'upstream',
-      message: timedOut ? 'انتهت مهلة الاتصال بـ Groq.' : 'تعذّر الاتصال بـ Groq من الخادم.',
+      message: timedOut ? 'انتهت مهلة الاتصال بـ OpenRouter.' : 'تعذّر الاتصال بـ OpenRouter من الخادم.',
       tookMs: Date.now() - t0,
     };
   }

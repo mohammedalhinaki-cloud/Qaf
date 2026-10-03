@@ -7,11 +7,11 @@ import test from 'node:test';
 
 import { citationLabel, shortBookTitle, splitAnswerText } from '../src/lib/citations.ts';
 import {
-  GROQ_KEY_NAMES,
+  TUA_KEY_NAMES,
   cleanSecret,
-  groqKeyDiagnostics,
+  openrouterKeyDiagnostics,
   lookupEnv,
-  resolveGroqKey,
+  resolveOpenRouterKey,
 } from '../src/lib/env.ts';
 import { neutralizeInstructions, safeSourceUrl, toPlainText, toSnippet } from '../src/lib/security/sanitize.ts';
 import { matchMadhhab } from '../src/lib/search/madhhab.ts';
@@ -213,11 +213,11 @@ test('splitAnswerText يترك الأقواس غير الاستشهادية نص
 /* ———————————— قراءة البيئة والمفتاح ———————————— */
 
 test('cleanSecret ينظّف اللصق الخاطئ للمفتاح', () => {
-  assert.equal(cleanSecret('  gsk_Test123  '), 'gsk_Test123');
-  assert.equal(cleanSecret('"gsk_Test123"'), 'gsk_Test123');
-  assert.equal(cleanSecret("'gsk_Test123'"), 'gsk_Test123');
-  assert.equal(cleanSecret('GROQ_API_KEY=gsk_Test123'), 'gsk_Test123');
-  assert.equal(cleanSecret('gsk_ Test\n123'), 'gsk_Test123');
+  assert.equal(cleanSecret('  sk-or-v1-REDACTED  '), 'sk-or-v1-REDACTED');
+  assert.equal(cleanSecret('"sk-or-v1-REDACTED"'), 'sk-or-v1-REDACTED');
+  assert.equal(cleanSecret("'sk-or-v1-REDACTED'"), 'sk-or-v1-REDACTED');
+  assert.equal(cleanSecret('TUA=sk-or-v1-REDACTED'), 'sk-or-v1-REDACTED');
+  assert.equal(cleanSecret('sk-or-v1- Test\n123'), 'sk-or-v1-Test123');
   assert.equal(cleanSecret(undefined), '');
 });
 
@@ -232,26 +232,26 @@ test('lookupEnv يقرأ من process.env عند الطلب لا عند التح
   delete process.env.HUJJAH_TEST_KEY;
 });
 
-test('resolveGroqKey يقبل الاسم الاحتياطي ويفضّل الاسم الرسمي', () => {
-  for (const n of GROQ_KEY_NAMES) delete process.env[n];
-  assert.equal(resolveGroqKey(), null);
+test('resolveOpenRouterKey يقبل الاسم الاحتياطي ويفضّل الاسم الرسمي', () => {
+  for (const n of TUA_KEY_NAMES) delete process.env[n];
+  assert.equal(resolveOpenRouterKey(), null);
 
-  process.env.GROQ_API_KEY_BUILD = 'gsk_BuildFallback';
-  assert.equal(resolveGroqKey()?.name, 'GROQ_API_KEY_BUILD');
+  process.env.TUA_BUILD = 'sk-or-v1-REDACTED';
+  assert.equal(resolveOpenRouterKey()?.name, 'TUA_BUILD');
 
-  process.env.GROQ_API_KEY = 'gsk_Primary';
-  assert.equal(resolveGroqKey()?.name, 'GROQ_API_KEY');
-  assert.equal(resolveGroqKey()?.value, 'gsk_Primary');
+  process.env.TUA = 'sk-or-v1-REDACTED';
+  assert.equal(resolveOpenRouterKey()?.name, 'TUA');
+  assert.equal(resolveOpenRouterKey()?.value, 'sk-or-v1-REDACTED');
 
-  for (const n of GROQ_KEY_NAMES) delete process.env[n];
+  for (const n of TUA_KEY_NAMES) delete process.env[n];
 });
 
-test('groqKeyDiagnostics لا يكشف قيمة المفتاح', () => {
-  process.env.GROQ_API_KEY = `gsk_${'x'.repeat(40)}`;
-  const d = groqKeyDiagnostics();
+test('openrouterKeyDiagnostics لا يكشف قيمة المفتاح', () => {
+  process.env.TUA = `sk-or-v1-${'x'.repeat(40)}`;
+  const d = openrouterKeyDiagnostics();
   assert.equal(d.configured, true);
-  assert.equal(d.name, 'GROQ_API_KEY');
-  assert.equal(d.looksLikeGroqKey, true);
+  assert.equal(d.name, 'TUA');
+  assert.equal(d.looksLikeOpenRouterKey, true);
   assert.ok(!JSON.stringify(d).includes('xxxxx'));
-  delete process.env.GROQ_API_KEY;
+  delete process.env.TUA;
 });

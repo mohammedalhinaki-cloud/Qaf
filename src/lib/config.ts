@@ -6,35 +6,35 @@
  * Cloudflare Workers لا تتوفّر وقت تحميل الوحدات. انظر `src/lib/env.ts`.
  */
 
-import { envBool, envInt, envString, resolveGroqKey } from '@/lib/env';
+import { envBool, envInt, envString, resolveOpenRouterKey } from '@/lib/env';
 
-export const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-120b';
-export const DEFAULT_GROQ_BASE_URL = 'https://api.groq.com/openai/v1';
+export const DEFAULT_TUA_MODEL = 'openai/gpt-oss-120b';
+export const DEFAULT_TUA_BASE_URL = 'https://openrouter.ai/api/v1';
 
 /**
  * جهد «التفكير» (reasoning_effort) في النماذج الاستدلالية مثل gpt-oss:
  * القيمة low تقلّل التفكير كي لا يستهلك النموذج كامل حدّ المخرجات في
  * التفكير ويعيد استجابة فارغة — وهو عطل يُفسَّر خطأً على أنه مشكلة في المفتاح.
- * تُرسل فقط للنماذج التي تدعمها (انظر supportsReasoningEffort في groq.ts).
+ * تُرسل فقط للنماذج التي تدعمها (انظر supportsReasoningEffort في openrouter.ts).
  */
 function reasoningEffort(): string | null {
-  const raw = envString('GROQ_REASONING_EFFORT', '').toLowerCase();
+  const raw = envString('TUA_REASONING_EFFORT', '').toLowerCase();
   if (/^(low|medium|high)$/.test(raw)) return raw;
   if (raw === 'none' || raw === 'off') return null;
   return 'low';
 }
 
 export const config = {
-  groq: {
+  openrouter: {
     /** يُقرأ عند كل استعمال من process.env ثم من سياق Cloudflare. */
     get apiKey(): string {
-      return resolveGroqKey()?.value ?? '';
+      return resolveOpenRouterKey()?.value ?? '';
     },
     get model(): string {
-      return envString('GROQ_MODEL', DEFAULT_GROQ_MODEL);
+      return envString('TUA_MODEL', DEFAULT_TUA_MODEL);
     },
     get baseUrl(): string {
-      return envString('GROQ_BASE_URL', DEFAULT_GROQ_BASE_URL).replace(/\/+$/, '');
+      return envString('TUA_BASE_URL', DEFAULT_TUA_BASE_URL).replace(/\/+$/, '');
     },
     get reasoningEffort(): string | null {
       return reasoningEffort();

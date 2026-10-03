@@ -47,16 +47,16 @@ curl -s 'https://<نطاقك>/api/health?probe=1' | jq
 
 ```bash
 npm install
-cp .env.example .env.local      # ثم ضع مفتاح Groq في .env.local
+cp .env.example .env.local      # ثم ضع مفتاح OpenRouter في .env.local
 npm run dev                     # http://localhost:3000
 ```
 
 | المتغيّر | مطلوب | الوصف |
 |---|---|---|
-| `GROQ_API_KEY` | ✅ | من <https://console.groq.com/keys> |
-| `GROQ_MODEL` | — | الافتراضي `openai/gpt-oss-120b` |
-| `GROQ_REASONING_EFFORT` | — | جهد «التفكير» على النماذج الاستدلالية (`low`/`medium`/`high`/`none`). الافتراضي `low` (يمنع الاستجابات الفارغة) |
-| `GROQ_BASE_URL` | — | الافتراضي `https://api.groq.com/openai/v1` |
+| `TUA` | ✅ | من <https://console.openrouter.com/keys> |
+| `TUA_MODEL` | — | الافتراضي `openai/gpt-oss-120b` |
+| `TUA_REASONING_EFFORT` | — | جهد «التفكير» على النماذج الاستدلالية (`low`/`medium`/`high`/`none`). الافتراضي `low` (يمنع الاستجابات الفارغة) |
+| `TUA_BASE_URL` | — | الافتراضي `https://openrouter.ai/api/v1` |
 | `TURATH_API_BASE` | — | الافتراضي `https://api.turath.io` |
 | `TURATH_APP_BASE` | — | الافتراضي `https://app.turath.io` |
 | `TURATH_ENABLED` | — | `false` لتعطيل مصدر البحث |
@@ -64,49 +64,49 @@ npm run dev                     # http://localhost:3000
 | `MAX_QUESTION_CHARS` | — | الافتراضي `500` |
 | `HUJJAH_DEV_FIXTURES` | — | وضع التطوير فقط (لا يعمل في الإنتاج) |
 
-الاسم الرسمي الوحيد للمفتاح هو `GROQ_API_KEY`، ويوجد اسم احتياطي `GROQ_API_KEY_BUILD` يُحقن من بيئة البناء في CI فقط.
+الاسم الرسمي الوحيد للمفتاح هو `TUA`، ويوجد اسم احتياطي `TUA_BUILD` يُحقن من بيئة البناء في CI فقط.
 
-**المفتاح يُقرأ على الخادم فقط.** لا يصل إلى المتصفح، ولا يظهر في أي سجل، وتُنقّى رسائل أخطاء Groq منه قبل عرضها. ويُقرأ **لحظة الطلب** من `process.env` ثم من سياق Cloudflare — لا عند تحميل الوحدات — لأن أسرار Workers لا تكون جاهزة وقت التحميل.
+**المفتاح يُقرأ على الخادم فقط.** لا يصل إلى المتصفح، ولا يظهر في أي سجل، وتُنقّى رسائل أخطاء OpenRouter منه قبل عرضها. ويُقرأ **لحظة الطلب** من `process.env` ثم من سياق Cloudflare — لا عند تحميل الوحدات — لأن أسرار Workers لا تكون جاهزة وقت التحميل.
 
 للتحقق السريع من المفتاح:
 
 ```bash
-npm run check:groq                                 # يفحص المفتاح محليًا لدى Groq
-npm run check:groq -- https://hujjah.maaoun.com    # يفحص النسخة المنشورة
+npm run check:openrouter                                 # يفحص المفتاح محليًا لدى OpenRouter
+npm run check:openrouter -- https://hujjah.maaoun.com    # يفحص النسخة المنشورة
 ```
 
 ### النشر على Cloudflare والنطاق
 
-هذا المشروع مُعَدّ لـ **Cloudflare Workers عبر OpenNext**، لا لـ Cloudflare Pages/static export؛ لأن المسارين `/api/ask` و`/api/health` يحتاجان تنفيذًا خادميًا ومفتاح Groq سريًا.
+هذا المشروع مُعَدّ لـ **Cloudflare Workers عبر OpenNext**، لا لـ Cloudflare Pages/static export؛ لأن المسارين `/api/ask` و`/api/health` يحتاجان تنفيذًا خادميًا ومفتاح OpenRouter سريًا.
 
 ```bash
 npm run preview  # يبني التطبيق ويشغّله محليًا على runtime Workers
 npm run deploy   # يبني وينشر Worker باسم qaf
 ```
 
-`npm run build` ينفّذ ثلاث خطوات: `next build` ← تحويل OpenNext إلى `.open-next` ← فحص مفتاح Groq (`scripts/prepare-preview.mjs`) الذي يطبع في سجل البناء هل المفتاح متاح ومن أين. محليًا لا يعدّل هذا السكربت أي ملف؛ وداخل CI فقط — وإن وُجد المفتاح في بيئة البناء — يحقنه في `wrangler.jsonc` باسم احتياطي `GROQ_API_KEY_BUILD` حتى لا يصطدم بالسرّ الحقيقي ولا يحوّله إلى نص ظاهر.
+`npm run build` ينفّذ ثلاث خطوات: `next build` ← تحويل OpenNext إلى `.open-next` ← فحص مفتاح OpenRouter (`scripts/prepare-preview.mjs`) الذي يطبع في سجل البناء هل المفتاح متاح ومن أين. محليًا لا يعدّل هذا السكربت أي ملف؛ وداخل CI فقط — وإن وُجد المفتاح في بيئة البناء — يحقنه في `wrangler.jsonc` باسم احتياطي `TUA_BUILD` حتى لا يصطدم بالسرّ الحقيقي ولا يحوّله إلى نص ظاهر.
 
-### ⚠️ مفتاح Groq على Cloudflare: الإعداد الصحيح
+### ⚠️ مفتاح OpenRouter على Cloudflare: الإعداد الصحيح
 
-1. **اضبطه كـ Secret لوقت التشغيل**: Cloudflare → Workers & Pages → `qaf` → **Settings → Variables and Secrets** → Add → **Type: Secret** → Name: `GROQ_API_KEY` → Deploy.
-   أو من الطرفية: `npx wrangler secret put GROQ_API_KEY`
-2. **«Build variables and secrets» ليست كافية.** متغيّرات البناء تصل إلى `next build` فقط ولا يراها الـ Worker أثناء التشغيل. هذا أشهر سبب لرسالة «مفتاح Groq غير مضبوط» رغم أن المفتاح يبدو مضبوطًا في اللوحة.
+1. **اضبطه كـ Secret لوقت التشغيل**: Cloudflare → Workers & Pages → `qaf` → **Settings → Variables and Secrets** → Add → **Type: Secret** → Name: `TUA` → Deploy.
+   أو من الطرفية: `npx wrangler secret put TUA`
+2. **«Build variables and secrets» ليست كافية.** متغيّرات البناء تصل إلى `next build` فقط ولا يراها الـ Worker أثناء التشغيل. هذا أشهر سبب لرسالة «مفتاح OpenRouter غير مضبوط» رغم أن المفتاح يبدو مضبوطًا في اللوحة.
 3. **لا تحذف متغيّرات اللوحة عند النشر**: `wrangler deploy` يمسح المتغيّرات النصية غير المذكورة في ملف الإعداد. لذلك أُضيف `"keep_vars": true` في `wrangler.jsonc`، وأمر النشر صار `opennextjs-cloudflare deploy -- --keep-vars`.
 4. **تأكّد من الـ Worker الصحيح**: الاسم هنا `qaf`. ضبط السرّ على Worker آخر أو على مشروع Pages لا يفيد.
 5. **بعد النشر تحقّق فعليًا**:
 
 ```bash
-curl -s 'https://hujjah.maaoun.com/api/health?probe=1' | jq '.ai, .probe.groq'
+curl -s 'https://hujjah.maaoun.com/api/health?probe=1' | jq '.ai, .probe.openrouter'
 ```
 
-يبيّن الناتج: هل وُجد المفتاح (`ai.key.found`)، ومن أي متغيّر (`ai.key.variable`)، ومن أي مصدر (`process.env` أو `cloudflare`)، وهل قبِله Groq فعلًا (`probe.groq.ok`). ولا تُكشف قيمة المفتاح في أي حال.
+يبيّن الناتج: هل وُجد المفتاح (`ai.key.found`)، ومن أي متغيّر (`ai.key.variable`)، ومن أي مصدر (`process.env` أو `cloudflare`)، وهل قبِله OpenRouter فعلًا (`probe.openrouter.ok`). ولا تُكشف قيمة المفتاح في أي حال.
 
 | ما تراه | المعنى | الإصلاح |
 |---|---|---|
 | `key.found = false` | الـ Worker لا يرى المفتاح | أضفه كـ Secret لوقت التشغيل ثم أعد النشر |
-| `probe.groq.code = "auth"` | Groq رفض المفتاح | مفتاح خاطئ أو مقيَّد أو منتهي الصلاحية |
-| `probe.groq.code = "model_not_found"` | المفتاح سليم والنموذج غير متاح | غيّر `GROQ_MODEL` |
-| `probe.groq.code = "rate_limit"` | تجاوز الحصّة | انتظر أو ارفع الحصّة |
+| `probe.openrouter.code = "auth"` | OpenRouter رفض المفتاح | مفتاح خاطئ أو مقيَّد أو منتهي الصلاحية |
+| `probe.openrouter.code = "model_not_found"` | المفتاح سليم والنموذج غير متاح | غيّر `TUA_MODEL` |
+| `probe.openrouter.code = "rate_limit"` | تجاوز الحصّة | انتظر أو ارفع الحصّة |
 
 لا تضع المفتاح داخل `wrangler.jsonc` في Git. لا حاجة إلى قاعدة بيانات أو Supabase في النسخة الحالية.
 
@@ -152,7 +152,7 @@ src/
 │   │   └── madhhab.ts            فلتر المذهب (من بيانات المصدر فقط)
 │   │
 │   ├── ai/                     ← طبقة النموذج
-│   │   ├── groq.ts               عميل REST + معالجة الأخطاء
+│   │   ├── openrouter.ts               عميل REST + معالجة الأخطاء
 │   │   ├── prompts.ts            تعليمات النظام والمخططات
 │   │   └── pipeline.ts           التخطيط + الصياغة + التحقق من الاستشهاد
 │   │
@@ -177,11 +177,11 @@ src/
 ```
 سؤال المستخدم
   ↓ التحقق + تحديد المعدّل + رفض محاولات تغيير القواعد
-  ↓ [Groq] تحليل السؤال → 1–3 استعلامات بحث عربية
+  ↓ [OpenRouter] تحليل السؤال → 1–3 استعلامات بحث عربية
   ↓ البحث في تراث (JSON API) — المصدر الوحيد
   ↓ استخراج النتائج والأدلة (كتاب، مؤلف، جزء، صفحة، نص، رابط)
   ↓ تنظيف + إزالة تكرار + ترتيب + ترجيح المذهب
-  ↓ [Groq] صياغة مستندة إلى المقاطع فقط (JSON مهيكل)
+  ↓ [OpenRouter] صياغة مستندة إلى المقاطع فقط (JSON مهيكل)
   ↓ التحقق: حذف كل استشهاد بمعرّف غير موجود
 إجابة + استشهادات داخلية قابلة للضغط تفتح المصدر في تراث
 ```
@@ -255,7 +255,7 @@ HUJJAH_DEV_FIXTURES=true npm run dev
 - يعمل فقط عندما يكون `NODE_ENV !== 'production'` **و** المتغيّر مضبوطًا — مستحيل تفعيله في الإنتاج.
 - يعرض شريطًا أصفر دائمًا في أعلى الصفحة يوضّح أن النتائج من ملف محفوظ.
 - البيانات المحفوظة **ليست مخترعة**: نسخة حرفية من استجابة حقيقية لواجهة تراث (بحث فقط)، بلا تعديل في اسم كتاب أو مؤلف أو جزء أو صفحة أو نص.
-- لا يؤثّر على النموذج: الإجابة تتطلّب مفتاح Groq حقيقيًا في كل الأحوال.
+- لا يؤثّر على النموذج: الإجابة تتطلّب مفتاح OpenRouter حقيقيًا في كل الأحوال.
 
 ---
 

@@ -2,6 +2,6 @@
 # لا تضع أسرار الإنتاج هنا، والملف مستبعَد من Git.
 NEXTJS_ENV=development
 
-# عند اختبار Groq على runtime الـ Worker محليًا، انسخ هذا الملف إلى .dev.vars
+# عند اختبار OpenRouter على runtime الـ Worker محليًا، انسخ هذا الملف إلى .dev.vars
 # وأضف المفتاح. (`next dev` يقرأ .env.local بدل هذا الملف.)
-# GROQ_API_KEY=
+# TUA=

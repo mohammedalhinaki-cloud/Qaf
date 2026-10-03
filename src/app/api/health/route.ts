@@ -1,6 +1,6 @@
-import { isGroqConfigured, pingGroq } from '@/lib/ai/groq';
+import { isOpenRouterConfigured, pingOpenRouter } from '@/lib/ai/openrouter';
 import { config } from '@/lib/config';
-import { groqKeyDiagnostics } from '@/lib/env';
+import { openrouterKeyDiagnostics } from '@/lib/env';
 import { clientKey, rateLimit } from '@/lib/security/ratelimit';
 import { searchTurath } from '@/lib/search/turath';
 
@@ -8,13 +8,13 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
- * فحص صحة حقيقي للنظام: حالة مفتاح Groq وحالة مصدر البحث (تراث).
+ * فحص صحة حقيقي للنظام: حالة مفتاح OpenRouter وحالة مصدر البحث (تراث).
  *
  * لا يكشف المفتاح إطلاقًا؛ يكشف فقط ما يلزم للتشخيص: هل وُجد، ومن أي متغيّر،
- * ومن أي مصدر (process.env أو سياق Cloudflare)، وطوله، وهل يقبله Groq.
+ * ومن أي مصدر (process.env أو سياق Cloudflare)، وطوله، وهل يقبله OpenRouter.
  *
  *   GET /api/health            → حالة الإعداد فقط (سريع، بلا شبكة)
- *   GET /api/health?probe=1    → يضيف اتصالًا حقيقيًا بـ Groq وتراث
+ *   GET /api/health?probe=1    → يضيف اتصالًا حقيقيًا بـ OpenRouter وتراث
  */
 export async function GET(req: Request) {
   const limit = rateLimit(`health:${clientKey(req.headers)}`, 12);
@@ -23,20 +23,20 @@ export async function GET(req: Request) {
   }
 
   const probe = new URL(req.url).searchParams.get('probe') === '1';
-  const key = groqKeyDiagnostics();
+  const key = openrouterKeyDiagnostics();
 
   const base = {
     ok: true,
     ai: {
-      configured: isGroqConfigured(),
-      model: config.groq.model,
+      configured: isOpenRouterConfigured(),
+      model: config.openrouter.model,
       key: {
         found: key.configured,
         /** اسم المتغيّر الذي قُرئ منه المفتاح — لا قيمته */
         variable: key.name,
         source: key.source,
         length: key.length,
-        looksLikeGroqKey: key.looksLikeGroqKey,
+        looksLikeOpenRouterKey: key.looksLikeOpenRouterKey,
         checkedNames: key.checkedNames,
         hint: key.hint,
       },
@@ -56,8 +56,8 @@ export async function GET(req: Request) {
 
   if (!probe) return Response.json(base, { headers: { 'Cache-Control': 'no-store' } });
 
-  const [groq, turath] = await Promise.all([
-    pingGroq(),
+  const [openrouter, turath] = await Promise.all([
+    pingOpenRouter(),
     (async () => {
       if (!config.turath.enabled) return { reachable: false, reason: 'معطّل' };
       const t0 = Date.now();
@@ -75,7 +75,7 @@ export async function GET(req: Request) {
   ]);
 
   return Response.json(
-    { ...base, ok: groq.ok && turath.reachable === true, probe: { groq, turath } },
+    { ...base, ok: openrouter.ok && turath.reachable === true, probe: { openrouter, turath } },
     { headers: { 'Cache-Control': 'no-store' } },
   );
 }

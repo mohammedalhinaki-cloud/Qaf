@@ -1,21 +1,21 @@
 /**
- * اختبار إعادة المحاولة التلقائية في عميل Groq عند ازدحام مؤقت (503)
+ * اختبار إعادة المحاولة التلقائية في عميل OpenRouter عند ازدحام مؤقت (503)
  * أو خطأ اتصال عابر، بدون أي اتصال شبكة فعلي (fetch مُموَّه بالكامل).
  * التشغيل: npm test
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { GROQ_KEY_NAMES } from '../src/lib/env.ts';
-import { GroqError, generateJson } from '../src/lib/ai/groq.ts';
+import { TUA_KEY_NAMES } from '../src/lib/env.ts';
+import { OpenRouterError, generateJson } from '../src/lib/ai/openrouter.ts';
 
 function setKey() {
-  for (const n of GROQ_KEY_NAMES) delete process.env[n];
-  process.env.GROQ_API_KEY = `gsk_${'x'.repeat(40)}`;
+  for (const n of TUA_KEY_NAMES) delete process.env[n];
+  process.env.TUA = `sk-or-v1-${'x'.repeat(40)}`;
 }
 
 function clearKey() {
-  for (const n of GROQ_KEY_NAMES) delete process.env[n];
+  for (const n of TUA_KEY_NAMES) delete process.env[n];
 }
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -29,7 +29,7 @@ function overloadedBody() {
   return { error: { message: 'Service Unavailable: the model is overloaded, try again later.', type: 'internal_server_error' } };
 }
 
-/** استجابة ناجحة بصيغة Groq (المتوافقة مع OpenAI chat/completions). */
+/** استجابة ناجحة بصيغة OpenRouter (المتوافقة مع OpenAI chat/completions). */
 function okBody(payload: unknown) {
   return {
     choices: [{ message: { role: 'assistant', content: JSON.stringify(payload) }, finish_reason: 'stop' }],
@@ -84,7 +84,7 @@ test('generateJson يعيد المحاولة بعد خطأ اتصال عابر (
   }
 });
 
-test('generateJson يرمي GroqError(overloaded) بعد استنفاد كل المحاولات', async () => {
+test('generateJson يرمي OpenRouterError(overloaded) بعد استنفاد كل المحاولات', async () => {
   setKey();
   const originalFetch = globalThis.fetch;
   let calls = 0;
@@ -97,7 +97,7 @@ test('generateJson يرمي GroqError(overloaded) بعد استنفاد كل ا�
     await assert.rejects(
       () => generateJson<{ ok: boolean }>({ system: 'sys', user: 'user', maxOutputTokens: 100 }),
       (e: unknown) => {
-        assert.ok(e instanceof GroqError);
+        assert.ok(e instanceof OpenRouterError);
         assert.equal(e.code, 'overloaded');
         return true;
       },
@@ -122,7 +122,7 @@ test('generateJson لا يعيد المحاولة عند 429 (تجاوز الح�
     await assert.rejects(
       () => generateJson<{ ok: boolean }>({ system: 'sys', user: 'user', maxOutputTokens: 100 }),
       (e: unknown) => {
-        assert.ok(e instanceof GroqError);
+        assert.ok(e instanceof OpenRouterError);
         assert.equal(e.code, 'rate_limit');
         return true;
       },
