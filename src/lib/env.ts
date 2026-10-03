@@ -170,7 +170,7 @@ export function openrouterKeyDiagnostics(): KeyDiagnostics {
       length: 0,
       looksLikeOpenRouterKey: false,
       hint:
-        'لم يُعثر على المفتاح في أي مصدر. على Cloudflare: Workers → qaf → Settings → ' +
+        'لم يُعثر على المفتاح في أي مصدر. على Cloudflare: افتح Worker الخاص بالموقع → Settings → ' +
         'Variables and Secrets → Add → نوع Secret باسم TUA ثم Deploy. ' +
         'انتبه: متغيّرات «Build» لا تصل إلى وقت التشغيل.',
     };
