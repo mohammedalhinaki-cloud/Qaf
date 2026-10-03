@@ -34,9 +34,22 @@ function migrateResult(raw: unknown): unknown {
     );
   }
   if (Array.isArray(r.evidence)) {
-    r.evidence = r.evidence.filter(
-      (e) => typeof e === 'object' && e !== null && (e as { source?: unknown }).source === 'turath',
-    );
+    r.evidence = r.evidence
+      .filter((e) => typeof e === 'object' && e !== null && (e as { source?: unknown }).source === 'turath')
+      .map((e) => {
+        const evidence = { ...(e as Record<string, unknown>) };
+        const match = evidence.madhhabMatch;
+        // نسخ قديمة استنتجت مذهب الكتاب من ترجمة المؤلف؛ لا نعرض ذلك
+        // التصنيف بعد الآن. المطابقة المقبولة الوحيدة هي cat_id الرسمي.
+        if (
+          typeof match !== 'object' ||
+          match === null ||
+          (match as { basis?: unknown }).basis !== 'turath-category'
+        ) {
+          evidence.madhhabMatch = null;
+        }
+        return evidence;
+      });
   }
   delete r.sources; // قسم «المصادر» المنفصل أُستبدل بالاستشهادات داخل النص
   return r;
