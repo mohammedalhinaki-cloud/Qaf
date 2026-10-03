@@ -6,41 +6,38 @@
  * Cloudflare Workers لا تتوفّر وقت تحميل الوحدات. انظر `src/lib/env.ts`.
  */
 
-import { envBool, envInt, envString, resolveGeminiKey } from '@/lib/env';
+import { envBool, envInt, envString, resolveGroqKey } from '@/lib/env';
 
-export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
-export const DEFAULT_GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
+export const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-120b';
+export const DEFAULT_GROQ_BASE_URL = 'https://api.groq.com/openai/v1';
 
 /**
- * ميزانية «التفكير» في نماذج 2.5: القيمة 0 تعطّل التفكير.
- * بدون تعطيله قد يستهلك النموذج كامل maxOutputTokens في التفكير
- * ويعيد استجابة فارغة — وهو عطل يُفسَّر خطأً على أنه مشكلة في المفتاح.
+ * جهد «التفكير» (reasoning_effort) في النماذج الاستدلالية مثل gpt-oss:
+ * القيمة low تقلّل التفكير كي لا يستهلك النموذج كامل حدّ المخرجات في
+ * التفكير ويعيد استجابة فارغة — وهو عطل يُفسَّر خطأً على أنه مشكلة في المفتاح.
+ * تُرسل فقط للنماذج التي تدعمها (انظر supportsReasoningEffort في groq.ts).
  */
-function thinkingBudget(): number | null {
-  const raw = envString('GEMINI_THINKING_BUDGET', '');
-  if (raw.length > 0) {
-    const n = Number.parseInt(raw, 10);
-    return Number.isFinite(n) && n >= 0 ? n : null;
-  }
-  // الافتراضي: تعطيل التفكير على نماذج flash فقط (pro لا يقبل 0).
-  const model = envString('GEMINI_MODEL', DEFAULT_GEMINI_MODEL).toLowerCase();
-  return /(^|[-/])gemini-(2\.5|3)[^/]*flash/.test(model) ? 0 : null;
+function reasoningEffort(): string | null {
+  const raw = envString('GROQ_REASONING_EFFORT', '').toLowerCase();
+  if (/^(low|medium|high)$/.test(raw)) return raw;
+  if (raw === 'none' || raw === 'off') return null;
+  return 'low';
 }
 
 export const config = {
-  gemini: {
+  groq: {
     /** يُقرأ عند كل استعمال من process.env ثم من سياق Cloudflare. */
     get apiKey(): string {
-      return resolveGeminiKey()?.value ?? '';
+      return resolveGroqKey()?.value ?? '';
     },
     get model(): string {
-      return envString('GEMINI_MODEL', DEFAULT_GEMINI_MODEL);
+      return envString('GROQ_MODEL', DEFAULT_GROQ_MODEL);
     },
     get baseUrl(): string {
-      return envString('GEMINI_BASE_URL', DEFAULT_GEMINI_BASE_URL).replace(/\/+$/, '');
+      return envString('GROQ_BASE_URL', DEFAULT_GROQ_BASE_URL).replace(/\/+$/, '');
     },
-    get thinkingBudget(): number | null {
-      return thinkingBudget();
+    get reasoningEffort(): string | null {
+      return reasoningEffort();
     },
   },
   turath: {

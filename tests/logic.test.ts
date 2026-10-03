@@ -7,11 +7,11 @@ import test from 'node:test';
 
 import { citationLabel, shortBookTitle, splitAnswerText } from '../src/lib/citations.ts';
 import {
-  GEMINI_KEY_NAMES,
+  GROQ_KEY_NAMES,
   cleanSecret,
-  geminiKeyDiagnostics,
+  groqKeyDiagnostics,
   lookupEnv,
-  resolveGeminiKey,
+  resolveGroqKey,
 } from '../src/lib/env.ts';
 import { neutralizeInstructions, safeSourceUrl, toPlainText, toSnippet } from '../src/lib/security/sanitize.ts';
 import { matchMadhhab } from '../src/lib/search/madhhab.ts';
@@ -213,11 +213,11 @@ test('splitAnswerText يترك الأقواس غير الاستشهادية نص
 /* ———————————— قراءة البيئة والمفتاح ———————————— */
 
 test('cleanSecret ينظّف اللصق الخاطئ للمفتاح', () => {
-  assert.equal(cleanSecret('  AIzaSyTest123  '), 'AIzaSyTest123');
-  assert.equal(cleanSecret('"AIzaSyTest123"'), 'AIzaSyTest123');
-  assert.equal(cleanSecret("'AIzaSyTest123'"), 'AIzaSyTest123');
-  assert.equal(cleanSecret('GEMINI_API_KEY=AIzaSyTest123'), 'AIzaSyTest123');
-  assert.equal(cleanSecret('AIzaSy Test\n123'), 'AIzaSyTest123');
+  assert.equal(cleanSecret('  gsk_Test123  '), 'gsk_Test123');
+  assert.equal(cleanSecret('"gsk_Test123"'), 'gsk_Test123');
+  assert.equal(cleanSecret("'gsk_Test123'"), 'gsk_Test123');
+  assert.equal(cleanSecret('GROQ_API_KEY=gsk_Test123'), 'gsk_Test123');
+  assert.equal(cleanSecret('gsk_ Test\n123'), 'gsk_Test123');
   assert.equal(cleanSecret(undefined), '');
 });
 
@@ -232,26 +232,26 @@ test('lookupEnv يقرأ من process.env عند الطلب لا عند التح
   delete process.env.HUJJAH_TEST_KEY;
 });
 
-test('resolveGeminiKey يقبل الأسماء البديلة ويفضّل الاسم الرسمي', () => {
-  for (const n of GEMINI_KEY_NAMES) delete process.env[n];
-  assert.equal(resolveGeminiKey(), null);
+test('resolveGroqKey يقبل الاسم الاحتياطي ويفضّل الاسم الرسمي', () => {
+  for (const n of GROQ_KEY_NAMES) delete process.env[n];
+  assert.equal(resolveGroqKey(), null);
 
-  process.env.GEMINI_API_KEY_BUILD = 'AIzaBuildFallback';
-  assert.equal(resolveGeminiKey()?.name, 'GEMINI_API_KEY_BUILD');
+  process.env.GROQ_API_KEY_BUILD = 'gsk_BuildFallback';
+  assert.equal(resolveGroqKey()?.name, 'GROQ_API_KEY_BUILD');
 
-  process.env.GEMINI_API_KEY = 'AIzaPrimary';
-  assert.equal(resolveGeminiKey()?.name, 'GEMINI_API_KEY');
-  assert.equal(resolveGeminiKey()?.value, 'AIzaPrimary');
+  process.env.GROQ_API_KEY = 'gsk_Primary';
+  assert.equal(resolveGroqKey()?.name, 'GROQ_API_KEY');
+  assert.equal(resolveGroqKey()?.value, 'gsk_Primary');
 
-  for (const n of GEMINI_KEY_NAMES) delete process.env[n];
+  for (const n of GROQ_KEY_NAMES) delete process.env[n];
 });
 
-test('geminiKeyDiagnostics لا يكشف قيمة المفتاح', () => {
-  process.env.GEMINI_API_KEY = `AIza${'x'.repeat(35)}`;
-  const d = geminiKeyDiagnostics();
+test('groqKeyDiagnostics لا يكشف قيمة المفتاح', () => {
+  process.env.GROQ_API_KEY = `gsk_${'x'.repeat(40)}`;
+  const d = groqKeyDiagnostics();
   assert.equal(d.configured, true);
-  assert.equal(d.name, 'GEMINI_API_KEY');
-  assert.equal(d.looksLikeGoogleKey, true);
+  assert.equal(d.name, 'GROQ_API_KEY');
+  assert.equal(d.looksLikeGroqKey, true);
   assert.ok(!JSON.stringify(d).includes('xxxxx'));
-  delete process.env.GEMINI_API_KEY;
+  delete process.env.GROQ_API_KEY;
 });

@@ -1,21 +1,21 @@
 /**
- * اختبار إعادة المحاولة التلقائية في عميل Gemini عند ازدحام مؤقت (503)
+ * اختبار إعادة المحاولة التلقائية في عميل Groq عند ازدحام مؤقت (503)
  * أو خطأ اتصال عابر، بدون أي اتصال شبكة فعلي (fetch مُموَّه بالكامل).
  * التشغيل: npm test
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { GEMINI_KEY_NAMES } from '../src/lib/env.ts';
-import { GeminiError, generateJson } from '../src/lib/ai/gemini.ts';
+import { GROQ_KEY_NAMES } from '../src/lib/env.ts';
+import { GroqError, generateJson } from '../src/lib/ai/groq.ts';
 
 function setKey() {
-  for (const n of GEMINI_KEY_NAMES) delete process.env[n];
-  process.env.GEMINI_API_KEY = `AIza${'x'.repeat(35)}`;
+  for (const n of GROQ_KEY_NAMES) delete process.env[n];
+  process.env.GROQ_API_KEY = `gsk_${'x'.repeat(40)}`;
 }
 
 function clearKey() {
-  for (const n of GEMINI_KEY_NAMES) delete process.env[n];
+  for (const n of GROQ_KEY_NAMES) delete process.env[n];
 }
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -26,11 +26,14 @@ function jsonResponse(status: number, body: unknown): Response {
 }
 
 function overloadedBody() {
-  return { error: { message: 'The model is overloaded. Please try again later.', status: 'UNAVAILABLE' } };
+  return { error: { message: 'Service Unavailable: the model is overloaded, try again later.', type: 'internal_server_error' } };
 }
 
+/** استجابة ناجحة بصيغة Groq (المتوافقة مع OpenAI chat/completions). */
 function okBody(payload: unknown) {
-  return { candidates: [{ content: { parts: [{ text: JSON.stringify(payload) }] }, finishReason: 'STOP' }] };
+  return {
+    choices: [{ message: { role: 'assistant', content: JSON.stringify(payload) }, finish_reason: 'stop' }],
+  };
 }
 
 test('generateJson يعيد المحاولة بعد 503 وينجح دون أن يصل الخطأ للمستخدم', async () => {
@@ -81,7 +84,7 @@ test('generateJson يعيد المحاولة بعد خطأ اتصال عابر (
   }
 });
 
-test('generateJson يرمي GeminiError(overloaded) بعد استنفاد كل المحاولات', async () => {
+test('generateJson يرمي GroqError(overloaded) بعد استنفاد كل المحاولات', async () => {
   setKey();
   const originalFetch = globalThis.fetch;
   let calls = 0;
@@ -94,7 +97,7 @@ test('generateJson يرمي GeminiError(overloaded) بعد استنفاد كل �
     await assert.rejects(
       () => generateJson<{ ok: boolean }>({ system: 'sys', user: 'user', maxOutputTokens: 100 }),
       (e: unknown) => {
-        assert.ok(e instanceof GeminiError);
+        assert.ok(e instanceof GroqError);
         assert.equal(e.code, 'overloaded');
         return true;
       },
@@ -112,14 +115,14 @@ test('generateJson لا يعيد المحاولة عند 429 (تجاوز الح�
   let calls = 0;
   globalThis.fetch = (async () => {
     calls += 1;
-    return jsonResponse(429, { error: { message: 'Quota exceeded' } });
+    return jsonResponse(429, { error: { message: 'Rate limit reached' } });
   }) as typeof fetch;
 
   try {
     await assert.rejects(
       () => generateJson<{ ok: boolean }>({ system: 'sys', user: 'user', maxOutputTokens: 100 }),
       (e: unknown) => {
-        assert.ok(e instanceof GeminiError);
+        assert.ok(e instanceof GroqError);
         assert.equal(e.code, 'rate_limit');
         return true;
       },

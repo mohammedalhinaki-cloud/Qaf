@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * تشخيص (وعند اللزوم تهيئة) مفتاح Gemini قبل النشر على Cloudflare.
+ * تشخيص (وعند اللزوم تهيئة) مفتاح Groq قبل النشر على Cloudflare.
  *
  * يعمل ضمن `npm run build` ويقوم بأمرين:
  *
@@ -9,9 +9,9 @@
  *    فقط، وهو لا يصل إلى الـ Worker أثناء التشغيل.)
  *
  * 2) شبكة أمان داخل CI فقط: إن وُجد المفتاح في بيئة البناء ولم يكن هناك سرّ
- *    وقت تشغيل، يُحقن في wrangler.jsonc باسم احتياطي `GEMINI_API_KEY_BUILD`
+ *    وقت تشغيل، يُحقن في wrangler.jsonc باسم احتياطي `GROQ_API_KEY_BUILD`
  *    (يقرأه التطبيق كآخر خيار). يُحقن باسم مختلف عمدًا حتى لا يصطدم بسرّ
- *    `GEMINI_API_KEY` في اللوحة ولا يحوّله إلى نص ظاهر.
+ *    `GROQ_API_KEY` في اللوحة ولا يحوّله إلى نص ظاهر.
  *
  * محليًا (خارج CI) لا يُعدَّل wrangler.jsonc إطلاقًا، حتى لا ينتهي سرّ في Git.
  * للإجبار: CF_INLINE_RUNTIME_VARS=1 — وللتعطيل: CF_INLINE_RUNTIME_VARS=0
@@ -24,18 +24,13 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const configPath = path.join(root, 'wrangler.jsonc');
 
 /** الأسماء المقبولة للمفتاح، بالترتيب نفسه المستعمل في src/lib/env.ts. */
-const KEY_NAMES = [
-  'GEMINI_API_KEY',
-  'GOOGLE_API_KEY',
-  'GOOGLE_GENERATIVE_AI_API_KEY',
-  'GOOGLE_AI_API_KEY',
-];
+const KEY_NAMES = ['GROQ_API_KEY'];
 
 /** الاسم الاحتياطي الذي يُحقن في إعدادات الـ Worker عند الحاجة. */
-const FALLBACK_VAR = 'GEMINI_API_KEY_BUILD';
+const FALLBACK_VAR = 'GROQ_API_KEY_BUILD';
 
-const log = (msg) => console.log(`[gemini-key] ${msg}`);
-const warn = (msg) => console.warn(`[gemini-key] ⚠ ${msg}`);
+const log = (msg) => console.log(`[groq-key] ${msg}`);
+const warn = (msg) => console.warn(`[groq-key] ⚠ ${msg}`);
 
 function cleanSecret(value) {
   if (typeof value !== 'string') return '';
@@ -98,16 +93,16 @@ const inlineAllowed = inlineFlag === undefined ? inCI : /^(1|true|yes|on)$/i.tes
 const key = resolveKey();
 
 if (!key) {
-  warn('لم يُعثر على مفتاح Gemini أثناء البناء.');
+  warn('لم يُعثر على مفتاح Groq أثناء البناء.');
   warn(
     'للإنتاج: Cloudflare Dashboard → Workers → qaf → Settings → Variables and Secrets → ' +
-      'Add → Type: Secret → Name: GEMINI_API_KEY → Deploy.',
+      'Add → Type: Secret → Name: GROQ_API_KEY → Deploy.',
   );
   warn('ملاحظة: متغيّرات «Build variables and secrets» لا تصل إلى وقت تشغيل الـ Worker.');
   process.exit(0);
 }
 
-const masked = `${key.value.length} حرفًا${key.value.startsWith('AIza') ? '، يبدأ بـ AIza' : ''}`;
+const masked = `${key.value.length} حرفًا${key.value.startsWith('gsk_') ? '، يبدأ بـ gsk_' : ''}`;
 log(`وُجد المفتاح في ${key.name} (${key.from}) — ${masked}.`);
 
 if (!inlineAllowed) {
@@ -123,7 +118,7 @@ config.vars ??= {};
 config.previews ??= {};
 config.previews.vars ??= {};
 
-// لا نكتب فوق GEMINI_API_KEY نفسه: السرّ في اللوحة هو المرجع الأعلى دائمًا.
+// لا نكتب فوق GROQ_API_KEY نفسه: السرّ في اللوحة هو المرجع الأعلى دائمًا.
 config.vars[FALLBACK_VAR] = key.value;
 config.previews.vars[FALLBACK_VAR] = key.value;
 
