@@ -61,6 +61,7 @@ export function ChatShell({ devFixtures = false }: { devFixtures?: boolean }) {
 
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   /* ——— تحميل المحادثات ——— */
   useEffect(() => {
@@ -81,8 +82,38 @@ export function ChatShell({ devFixtures = false }: { devFixtures?: boolean }) {
 
   const messages = active?.messages ?? [];
 
+  /**
+   * قفل الصفحة الرئيسية داخل ارتفاع الجهاز، وتتبّع ارتفاع المنطقة المرئية
+   * (visualViewport) حتى لا تنكسر الواجهة عند فتح لوحة المفاتيح على الهاتف.
+   */
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    const root = document.documentElement;
+    root.classList.add('app-locked');
+
+    const vv = window.visualViewport;
+    const apply = () => {
+      const h = vv?.height ?? window.innerHeight;
+      root.style.setProperty('--app-height', `${Math.round(h)}px`);
+    };
+    apply();
+    vv?.addEventListener('resize', apply);
+    vv?.addEventListener('scroll', apply);
+    window.addEventListener('orientationchange', apply);
+
+    return () => {
+      root.classList.remove('app-locked');
+      root.style.removeProperty('--app-height');
+      vv?.removeEventListener('resize', apply);
+      vv?.removeEventListener('scroll', apply);
+      window.removeEventListener('orientationchange', apply);
+    };
+  }, []);
+
+  /** التمرير إلى آخر إجابة داخل منطقة المحادثة وحدها (لا تتحرّك الصفحة). */
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, [messages.length, live.stage]);
 
   /* ——— إدارة المحادثات ——— */
@@ -207,7 +238,7 @@ export function ChatShell({ devFixtures = false }: { devFixtures?: boolean }) {
   const isEmpty = messages.length === 0 && !busy;
 
   return (
-    <div className="flex h-screen w-full flex-col justify-between overflow-hidden bg-ink-bg">
+    <div className="app-viewport flex w-full flex-col overflow-hidden bg-ink-bg">
       <Sidebar
         conversations={conversations}
         activeId={activeId}
@@ -233,7 +264,7 @@ export function ChatShell({ devFixtures = false }: { devFixtures?: boolean }) {
 
         {/* ——— ١) شريط علوي ثابت: زر القائمة (≡) + الشعار فقط ——— */}
         <header
-          className="sticky top-0 z-20 flex shrink-0 items-center gap-2.5 border-b border-ink-line
+          className="safe-top z-20 flex shrink-0 items-center gap-2.5 border-b border-ink-line
                      bg-ink-bg/90 px-3 py-2.5 backdrop-blur"
         >
           <button
@@ -253,7 +284,7 @@ export function ChatShell({ devFixtures = false }: { devFixtures?: boolean }) {
 
         {/* ——— ٢) المنطقة الوسطى القابلة للتمرير: سجل المحادثة أو شاشة الترحيب ——— */}
         {isEmpty ? (
-          <section className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden px-4">
+          <section className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-4">
             <div className="w-full max-w-2xl text-center">
               <div className="mb-4 flex justify-center">
                 <Logo size={56} />
@@ -267,7 +298,7 @@ export function ChatShell({ devFixtures = false }: { devFixtures?: boolean }) {
             </div>
           </section>
         ) : (
-          <div className="flex-1 overflow-y-auto">
+          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             <div className="mx-auto w-full max-w-3xl space-y-8 px-4 py-6">
               {messages.map((m) =>
                 m.role === 'user' ? (
@@ -329,11 +360,12 @@ export function ChatShell({ devFixtures = false }: { devFixtures?: boolean }) {
         )}
 
         {/* ——— ٣) رصيف سفلي واحد: المقترحات ثم الإدخال ثم التنبيه ——— */}
-        <div className="sticky bottom-0 z-20 w-full shrink-0 space-y-3 bg-ink-bg/95 p-4 pb-2 backdrop-blur">
+        <div className="safe-bottom z-20 w-full shrink-0 border-t border-ink-line/60 bg-ink-bg/95 px-3 pt-2.5 backdrop-blur sm:px-4">
           <div className={`mx-auto w-full ${isEmpty ? 'max-w-2xl' : 'max-w-3xl'}`}>
             {isEmpty && (
               <div
-                className="no-scrollbar mb-3 flex flex-row gap-2 overflow-x-auto whitespace-nowrap pb-0.5"
+                className="no-scrollbar mb-2.5 flex max-h-11 flex-row items-center gap-2 overflow-x-auto
+                           overscroll-x-contain whitespace-nowrap pb-0.5"
                 role="group"
                 aria-label="أسئلة مقترحة"
               >

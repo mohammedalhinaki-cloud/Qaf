@@ -23,6 +23,7 @@
 
   html {
     -webkit-text-size-adjust: 100%;
+    height: 100%;
   }
 
   body {
@@ -30,6 +31,45 @@
     color: rgb(var(--c-text));
     font-feature-settings: 'kern', 'liga';
     text-rendering: optimizeLegibility;
+    min-height: 100%;
+  }
+
+  /*
+   * شاشة المحادثة: الصفحة نفسها لا تتمرّر أبدًا — الارتفاع محصور في ارتفاع الجهاز،
+   * والتمرير يحدث داخل منطقة المحادثة فقط (نمط ChatGPT/Gemini).
+   * تُضاف الفئة من ChatShell حتى تبقى صفحات المحتوى (عن/المصادر) قابلة للتمرير طبيعيًا.
+   */
+  html.app-locked,
+  html.app-locked body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  html.app-locked body {
+    /* يمنع «المطّاط» في iOS ويجمّد الصفحة الرئيسية داخل الشاشة. */
+    position: fixed;
+    inset: 0;
+    width: 100%;
+  }
+
+  /*
+   * ارتفاع التطبيق: 100dvh مع تجاوز ديناميكي من visualViewport عند فتح لوحة المفاتيح.
+   * (100vh وحدها غير كافية بسبب شريط عنوان متصفحات الهاتف.)
+   */
+  .app-viewport {
+    height: 100vh;
+    height: 100dvh;
+    height: var(--app-height, 100dvh);
+    max-height: var(--app-height, 100dvh);
+  }
+
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .safe-bottom {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
   }
 
   /* قراءة طويلة مريحة بالعربية */
