@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { planSearch, synthesizeAnswer } from '@/lib/ai/pipeline';
-import { GroqError, isGroqConfigured } from '@/lib/ai/groq';
+import { OpenRouterError, isOpenRouterConfigured } from '@/lib/ai/openrouter';
 import { config } from '@/lib/config';
 import { clientKey, rateLimit } from '@/lib/security/ratelimit';
 import { ValidationError, parseAskRequest } from '@/lib/security/validate';
@@ -55,9 +55,9 @@ export async function POST(req: NextRequest) {
     return jsonError('طلب غير صالح.', 400, 'bad_request');
   }
 
-  if (!isGroqConfigured()) {
+  if (!isOpenRouterConfigured()) {
     return jsonError(
-      'النظام غير مهيّأ: مفتاح Groq غير مضبوط على الخادم. أضف GROQ_API_KEY كـ Secret في ' +
+      'النظام غير مهيّأ: مفتاح OpenRouter غير مضبوط على الخادم. أضف TUA كـ Secret في ' +
         'متغيّرات البيئة ثم أعد النشر. لمعرفة التفاصيل افتح المسار /api/health?probe=1',
       503,
       'missing_key',
@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
         } catch (e) {
           // فشل النموذج بعد نجاح البحث: لا نُضيّع مادة حقيقية استُرجعت فعلًا.
           // نعرض المقاطع كما هي ونوضّح أن الصياغة لم تتم. ولا نعرض أي إجابة.
-          const reason = e instanceof GroqError ? e.message : 'تعذّرت صياغة الإجابة.';
+          const reason = e instanceof OpenRouterError ? e.message : 'تعذّرت صياغة الإجابة.';
           const result: AskResult = {
             questionId: crypto.randomUUID(),
             question,
@@ -229,12 +229,12 @@ export async function POST(req: NextRequest) {
         controller.close();
       } catch (e) {
         const message =
-          e instanceof GroqError
+          e instanceof OpenRouterError
             ? e.message
             : e instanceof Error && (e.name === 'AbortError' || e.name === 'TimeoutError')
               ? 'انتهت مهلة المعالجة. حاول مرة أخرى.'
               : 'حدث خطأ غير متوقّع أثناء المعالجة.';
-        const code = e instanceof GroqError ? e.code : 'internal';
+        const code = e instanceof OpenRouterError ? e.code : 'internal';
         send({ type: 'error', message, code });
         send({ type: 'stage', stage: 'failed', label: STAGE_LABEL.failed });
         controller.close();

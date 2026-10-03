@@ -5,7 +5,7 @@
  * على Cloudflare Workers (OpenNext) لا تكون الأسرار جاهزة أثناء تقييم الوحدات
  * (module scope)؛ فهي تُحقن في `process.env` عند أول طلب فقط، كما تتوفّر دائمًا
  * داخل «سياق Cloudflare». أي قراءة مبكّرة تُنتج قيمة فارغة تبقى فارغة إلى الأبد،
- * وهذا سبب شائع جدًا لرسالة «مفتاح Groq غير مضبوط» رغم ضبط السر في اللوحة.
+ * وهذا سبب شائع جدًا لرسالة «مفتاح OpenRouter غير مضبوط» رغم ضبط السر في اللوحة.
  *
  * لذلك: كل قراءة هنا تحدث عند الاستعمال، ومن مصدرين معًا:
  *   1) process.env            (nodejs_compat / next dev / Node)
@@ -74,7 +74,7 @@ export function cleanValue(raw: unknown): string {
  * تنظيف سرّ (مفتاح API). يعالج أشهر أخطاء اللصق:
  *   - مسافات أو سطر جديد في الطرفين أو الوسط
  *   - اقتباسات محيطة
- *   - لصق السطر كاملًا: `GROQ_API_KEY=gsk_...`
+ *   - لصق السطر كاملًا: `TUA=sk-or-v1-...`
  */
 export function cleanSecret(raw: unknown): string {
   let value = cleanValue(raw);
@@ -83,7 +83,7 @@ export function cleanSecret(raw: unknown): string {
   const pasted = /^[A-Za-z_][A-Za-z0-9_]*\s*=\s*(.+)$/s.exec(value);
   if (pasted) value = cleanValue(pasted[1]);
 
-  // مفاتيح Groq لا تحتوي أي فراغ؛ أي فراغ هنا خطأ لصق.
+  // مفاتيح OpenRouter لا تحتوي أي فراغ؛ أي فراغ هنا خطأ لصق.
   return value.replace(/\s+/gu, '');
 }
 
@@ -125,18 +125,18 @@ export function envInt(name: string, fallback: number): number {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
-/* ———————————————— مفتاح Groq ———————————————— */
+/* ———————————————— مفتاح OpenRouter ———————————————— */
 
 /**
- * أسماء مقبولة للمفتاح. `GROQ_API_KEY` هو الاسم الرسمي الوحيد.
- * `GROQ_API_KEY_BUILD` آخر الاحتياطات: يُحقن من بيئة البناء (Workers Builds)
+ * أسماء مقبولة للمفتاح. `TUA` هو الاسم الرسمي الوحيد.
+ * `TUA_BUILD` آخر الاحتياطات: يُحقن من بيئة البناء (Workers Builds)
  * حين لا يوجد سرّ وقت تشغيل، ولا يطغى أبدًا على السرّ.
  */
-export const GROQ_KEY_NAMES = ['GROQ_API_KEY', 'GROQ_API_KEY_BUILD'] as const;
+export const TUA_KEY_NAMES = ['TUA', 'TUA_BUILD'] as const;
 
-/** يحلّ مفتاح Groq عند الطلب. يعيد null إن لم يوجد في أي مصدر. */
-export function resolveGroqKey(): EnvHit | null {
-  return lookupEnv(GROQ_KEY_NAMES, true);
+/** يحلّ مفتاح OpenRouter عند الطلب. يعيد null إن لم يوجد في أي مصدر. */
+export function resolveOpenRouterKey(): EnvHit | null {
+  return lookupEnv(TUA_KEY_NAMES, true);
 }
 
 export interface KeyDiagnostics {
@@ -145,8 +145,8 @@ export interface KeyDiagnostics {
   name: string | null;
   source: EnvSource | null;
   length: number;
-  /** هل يشبه شكل مفاتيح Groq (gsk_…)؟ */
-  looksLikeGroqKey: boolean;
+  /** هل يشبه شكل مفاتيح OpenRouter (sk-or-v1-…)؟ */
+  looksLikeOpenRouterKey: boolean;
   /** الأسماء التي بحثنا عنها، لتسهيل التشخيص */
   checkedNames: string[];
   onCloudflare: boolean;
@@ -154,10 +154,10 @@ export interface KeyDiagnostics {
 }
 
 /** تشخيص آمن للمفتاح: لا يكشف القيمة إطلاقًا، فقط ما يكفي لمعرفة سبب العطل. */
-export function groqKeyDiagnostics(): KeyDiagnostics {
-  const hit = resolveGroqKey();
+export function openrouterKeyDiagnostics(): KeyDiagnostics {
+  const hit = resolveOpenRouterKey();
   const base = {
-    checkedNames: [...GROQ_KEY_NAMES],
+    checkedNames: [...TUA_KEY_NAMES],
     onCloudflare: onCloudflareWorker(),
   };
 
@@ -168,15 +168,15 @@ export function groqKeyDiagnostics(): KeyDiagnostics {
       name: null,
       source: null,
       length: 0,
-      looksLikeGroqKey: false,
+      looksLikeOpenRouterKey: false,
       hint:
         'لم يُعثر على المفتاح في أي مصدر. على Cloudflare: Workers → qaf → Settings → ' +
-        'Variables and Secrets → Add → نوع Secret باسم GROQ_API_KEY ثم Deploy. ' +
+        'Variables and Secrets → Add → نوع Secret باسم TUA ثم Deploy. ' +
         'انتبه: متغيّرات «Build» لا تصل إلى وقت التشغيل.',
     };
   }
 
-  const looksLikeGroqKey = /^gsk_[0-9A-Za-z_-]{20,}$/.test(hit.value);
+  const looksLikeOpenRouterKey = /^sk-or-v1-[0-9A-Za-z_-]{20,}$/.test(hit.value);
   const suspiciousLength = hit.value.length < 20 || hit.value.length > 200;
 
   return {
@@ -185,11 +185,11 @@ export function groqKeyDiagnostics(): KeyDiagnostics {
     name: hit.name,
     source: hit.source,
     length: hit.value.length,
-    looksLikeGroqKey,
-    hint: looksLikeGroqKey
+    looksLikeOpenRouterKey,
+    hint: looksLikeOpenRouterKey
       ? 'المفتاح موجود وشكله سليم.'
       : suspiciousLength
         ? 'المفتاح موجود لكن طوله غير معتاد؛ تأكّد أنك نسخت المفتاح كاملًا بلا مسافات.'
-        : 'المفتاح موجود لكنه لا يبدأ بـ gsk_؛ تأكّد أنه مفتاح Groq من console.groq.com وليس مفتاحًا آخر.',
+        : 'المفتاح موجود لكنه لا يبدأ بـ sk-or-v1-؛ تأكّد أنه مفتاح OpenRouter من openrouter.ai وليس مفتاحًا آخر.',
   };
 }

@@ -12,7 +12,7 @@ interface HealthResponse {
 }
 
 /**
- * شريط تنبيه يظهر فقط حين لا يرى الخادم مفتاح Groq.
+ * شريط تنبيه يظهر فقط حين لا يرى الخادم مفتاح OpenRouter.
  * يجعل العطل مرئيًا فورًا بدل انتظار فشل أول سؤال، ويشرح الإصلاح بدقّة.
  * لا يعرض المفتاح ولا أي جزء منه.
  */
@@ -31,7 +31,7 @@ export function ConfigBanner() {
         if (data.ai?.configured === false) {
           setState({
             missing: true,
-            hint: data.ai.key?.hint ?? 'أضف GROQ_API_KEY كـ Secret في متغيّرات بيئة الخادم.',
+            hint: data.ai.key?.hint ?? 'أضف TUA كـ Secret في متغيّرات بيئة الخادم.',
           });
         }
       } catch {
@@ -52,7 +52,7 @@ export function ConfigBanner() {
     >
       <IconAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
       <div className="min-w-0 flex-1">
-        <p className="font-semibold">مفتاح Groq غير مضبوط على الخادم، لذلك لن تعمل الإجابات.</p>
+        <p className="font-semibold">مفتاح OpenRouter غير مضبوط على الخادم، لذلك لن تعمل الإجابات.</p>
         <p className="mt-0.5 opacity-90">{state.hint}</p>
         <p className="mt-0.5 opacity-75">
           للتشخيص التفصيلي افتح{' '}

@@ -1,7 +1,7 @@
 import { config } from '@/lib/config';
 import { neutralizeInstructions, toPlainText } from '@/lib/security/sanitize';
 import { SOURCE_LABEL, type AnswerClaim, type Disagreement, type Evidence, type Madhhab } from '@/lib/types';
-import { generateJson } from './groq';
+import { generateJson } from './openrouter';
 import {
   ANSWER_SCHEMA,
   ANSWER_SYSTEM,
