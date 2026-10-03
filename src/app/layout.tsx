@@ -57,6 +57,19 @@ export const viewport: Viewport = {
   ],
 };
 
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'WebApplication',
+  name: SITE_NAME,
+  alternateName: ['Hujjah', 'حُجَّة الباحث الإسلامي'],
+  url: SITE_URL,
+  applicationCategory: 'EducationalApplication',
+  operatingSystem: 'Web',
+  inLanguage: 'ar',
+  description: SITE_DESCRIPTION,
+  isRelatedTo: { '@type': 'WebApplication', name: 'قاف', url: 'https://qaf.ai/ar' },
+};
+
 /** يضبط السمة قبل أول رسم لتفادي ومضة التبديل. */
 const themeScript = `(function(){try{var t=localStorage.getItem('hujjah.theme')||localStorage.getItem('maoun.theme');var d=t?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;if(d)document.documentElement.classList.add('dark');}catch(e){}})();`;
 
@@ -64,6 +77,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning>
       <head>
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
         {/* خط عربي للويب. في حال تعذّر تحميله يعود التطبيق إلى خطوط النظام العربية. */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

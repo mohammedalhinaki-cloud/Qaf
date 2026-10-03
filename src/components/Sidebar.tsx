@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import type { Conversation } from '@/lib/types';
+import Link from 'next/link';
 import { IconClose, IconPlus, IconTrash } from './icons';
 import { InfoItems } from './InfoItems';
 import { Logo, Wordmark } from './Logo';
@@ -142,6 +143,11 @@ export function Sidebar({ conversations, activeId, open, onClose, onNew, onSelec
             <ThemeToggle />
           </div>
         </div>
+        <nav aria-label="معلومات حُجَّة" className="flex flex-wrap gap-x-3 gap-y-1 border-t border-ink-line px-3 py-2 text-[11px] text-ink-muted">
+          <Link href="/about" className="hover:text-ink-accent hover:underline">عن حُجَّة</Link>
+          <Link href="/sources" className="hover:text-ink-accent hover:underline">المصادر</Link>
+          <Link href="/compare/qaf" className="hover:text-ink-accent hover:underline">حُجَّة وقاف</Link>
+        </nav>
       </aside>
     </>
   );
