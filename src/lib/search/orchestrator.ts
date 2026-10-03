@@ -2,7 +2,7 @@ import { config } from '@/lib/config';
 import type { Evidence, Madhhab, SourceStatus } from '@/lib/types';
 import { MADHHAB_LABEL } from '@/lib/types';
 import { matchMadhhab } from './madhhab';
-import { dedupe, scoreEvidence, tokens } from './rank';
+import { dedupe, rankEvidence, scoreEvidence, tokens } from './rank';
 import { getTurathAuthorBio, getTurathBookCategory, searchTurath } from './turath';
 
 export interface SearchOutcome {
@@ -101,10 +101,13 @@ export async function searchAllSources(
     collected.push({ ...withMatch, score: scoreEvidence(withMatch, qTokens) });
   }
 
-  const ranked = dedupe(collected.sort((a, b) => b.score - a.score)).slice(
+  // نختار أولًا أقرب النتائج بالصلة وحدها؛ وبذلك لا يستطيع اختيار المذهب
+  // إدخال مصدر أو إخراج آخر من مجموعة الأدلة، وإنما يعيد ترتيبها فقط.
+  const mostRelevant = dedupe(collected.sort((a, b) => b.score - a.score)).slice(
     0,
     config.limits.maxEvidence,
   );
+  const ranked = rankEvidence(mostRelevant, madhhab);
 
   // ترقيم الأدلة بعد الترتيب النهائي: ن1، ن2 ...
   const evidence = ranked.map((ev, i) => ({ ...ev, id: `ن${i + 1}` }));

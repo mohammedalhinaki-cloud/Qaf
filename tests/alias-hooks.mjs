@@ -8,5 +8,14 @@ export async function resolve(specifier, context, nextResolve) {
     const target = new URL(`${rel}.ts`, srcRoot);
     return nextResolve(pathToFileURL(fileURLToPath(target)).href, context);
   }
-  return nextResolve(specifier, context);
+
+  try {
+    return await nextResolve(specifier, context);
+  } catch (error) {
+    // يكتب كود التطبيق الواردات النسبية بلا امتداد؛ أضف .ts عند تشغيله مباشرة في Node.
+    if ((specifier.startsWith('./') || specifier.startsWith('../')) && context.parentURL) {
+      return nextResolve(new URL(`${specifier}.ts`, context.parentURL).href, context);
+    }
+    throw error;
+  }
 }

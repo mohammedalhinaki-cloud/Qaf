@@ -1,4 +1,4 @@
-import type { Evidence } from '@/lib/types';
+import type { Evidence, Madhhab } from '@/lib/types';
 
 /** تطبيع عربي خفيف للمقارنة فقط — لا يُغيّر النص المعروض. */
 export function normalizeArabic(s: string): string {
@@ -26,8 +26,8 @@ export function tokens(s: string): string[] {
 }
 
 /**
- * ترتيب المقطع بناءً على تغطية كلمات السؤال، مع ترجيح المذهب
- * عندما يكون مسنَدًا إلى بيانات المصدر فقط.
+ * درجة الصلة الأساسية للمقطع. تبقى مستقلة تمامًا عن اختيار المذهب كي لا
+ * يتحول الاختيار إلى شرط استبعاد أو يتغلب على صلة نتيجة البحث.
  */
 export function scoreEvidence(ev: Omit<Evidence, 'score'>, queryTokens: string[]): number {
   const hay = normalizeArabic(`${ev.bookTitle} ${(ev.headings ?? []).join(' ')} ${ev.snippet ?? ''} ${ev.text}`);
@@ -55,12 +55,37 @@ export function scoreEvidence(ev: Omit<Evidence, 'score'>, queryTokens: string[]
   if (ev.page !== undefined) score += 0.5;
   if (ev.volume !== undefined) score += 0.2;
 
-  // ترجيح المذهب — فقط عند وجود سند من المصدر
-  if (ev.madhhabMatch) {
-    score += ev.madhhabMatch.basis === 'source-category' ? 2.5 : 1.2;
-  }
-
   return Math.round(score * 100) / 100;
+}
+
+/**
+ * ترجيح صغير ومحدود للمذهب بعد حساب الصلة واختيار النتائج الأقرب.
+ * أقل من وزن تطابق كلمة واحدة، ولذلك لا يستطيع تعويض فارق صلة معتبر.
+ */
+const MADHHAB_PRIORITY_BOOST = 0.35;
+
+/**
+ * يعيد ترتيب النتائج الموجودة فقط؛ لا يحذف أو يضيف نتيجة ولا يغير درجتها
+ * الأساسية أو معرّفاتها. وعند عدم اختيار مذهب يعيد ترتيب الصلة كما هو.
+ */
+export function rankEvidence(evidence: Evidence[], madhhab: Madhhab): Evidence[] {
+  return evidence
+    .map((ev, index) => {
+      const matchesSelected =
+        madhhab !== 'all' && ev.madhhabMatch?.madhhab === madhhab;
+      return {
+        ev,
+        index,
+        rankScore: ev.score + (matchesSelected ? MADHHAB_PRIORITY_BOOST : 0),
+      };
+    })
+    .sort(
+      (a, b) =>
+        b.rankScore - a.rankScore ||
+        b.ev.score - a.ev.score ||
+        a.index - b.index,
+    )
+    .map(({ ev }) => ev);
 }
 
 /** إزالة التكرار: نفس الكتاب ونفس الصفحة، أو نص شبه متطابق. */
