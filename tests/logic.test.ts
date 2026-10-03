@@ -15,7 +15,7 @@ import {
 } from '../src/lib/env.ts';
 import { neutralizeInstructions, safeSourceUrl, toPlainText, toSnippet } from '../src/lib/security/sanitize.ts';
 import { matchMadhhab } from '../src/lib/search/madhhab.ts';
-import { dedupe, normalizeArabic, scoreEvidence, tokens } from '../src/lib/search/rank.ts';
+import { dedupe, normalizeArabic, rankEvidence, scoreEvidence, tokens } from '../src/lib/search/rank.ts';
 import type { Evidence } from '../src/lib/types.ts';
 
 /* ———————————— التنظيف ———————————— */
@@ -116,7 +116,7 @@ function ev(partial: Partial<Evidence>): Omit<Evidence, 'score'> {
   } as Omit<Evidence, 'score'>;
 }
 
-test('scoreEvidence يرفع المطابق للمذهب المسنَد من المصدر', () => {
+test('scoreEvidence يبقي درجة الصلة مستقلة عن المذهب', () => {
   const q = tokens('النية في الوضوء');
   const plain = scoreEvidence(ev({ text: 'النية في الوضوء واجبة عند الجمهور وقد اختلفوا في ذلك.' }), q);
   const matched = scoreEvidence(
@@ -126,7 +126,66 @@ test('scoreEvidence يرفع المطابق للمذهب المسنَد من ا�
     }),
     q,
   );
-  assert.ok(matched > plain);
+  assert.equal(matched, plain);
+});
+
+test('rankEvidence لا يؤثر عند عدم اختيار مذهب', () => {
+  const list = [
+    { ...ev({ id: 'ن1', bookId: 'A' }), score: 95 },
+    {
+      ...ev({
+        id: 'ن2',
+        bookId: 'B',
+        madhhabMatch: { madhhab: 'hanafi', basis: 'source-category', basisText: 'الفقه الحنفي' },
+      }),
+      score: 90,
+    },
+    { ...ev({ id: 'ن3', bookId: 'C' }), score: 90.2 },
+  ] as Evidence[];
+
+  assert.deepEqual(rankEvidence(list, 'all').map((item) => item.bookId), ['A', 'C', 'B']);
+});
+
+test('rankEvidence يفضّل المطابق الحنفي القريب دون أن يتغلب على فارق صلة كبير', () => {
+  const list = [
+    { ...ev({ id: 'ن1', bookId: 'A', pageId: 1 }), score: 95 },
+    {
+      ...ev({
+        id: 'ن2',
+        bookId: 'B',
+        pageId: 2,
+        madhhabMatch: { madhhab: 'hanafi', basis: 'source-category', basisText: 'الفقه الحنفي' },
+      }),
+      score: 90,
+    },
+    { ...ev({ id: 'ن3', bookId: 'C', pageId: 3 }), score: 90.2 },
+    {
+      ...ev({
+        id: 'ن4',
+        bookId: 'D',
+        pageId: 4,
+        madhhabMatch: { madhhab: 'hanafi', basis: 'source-category', basisText: 'الفقه الحنفي' },
+      }),
+      score: 80,
+    },
+  ] as Evidence[];
+
+  const ranked = rankEvidence(list, 'hanafi');
+  assert.deepEqual(ranked.map((item) => item.bookId), ['A', 'B', 'C', 'D']);
+  assert.equal(ranked.length, list.length);
+  assert.deepEqual(
+    new Set(ranked.map((item) => `${item.id}|${item.bookId}|${item.pageId}|${item.url}`)),
+    new Set(list.map((item) => `${item.id}|${item.bookId}|${item.pageId}|${item.url}`)),
+  );
+});
+
+test('rankEvidence لا يرفع المصدر غير المصنف بالمذهب المختار', () => {
+  const list = [
+    { ...ev({ id: 'ن1', bookId: 'A', madhhabMatch: null }), score: 90.2 },
+    { ...ev({ id: 'ن2', bookId: 'B', madhhabMatch: null }), score: 90 },
+  ] as Evidence[];
+
+  assert.deepEqual(rankEvidence(list, 'hanafi').map((item) => item.bookId), ['A', 'B']);
 });
 
 test('scoreEvidence يرفع المقطع المحدَّد الموضع', () => {
