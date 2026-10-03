@@ -7,7 +7,8 @@ import test from 'node:test';
 
 import { citationLabel, shortBookTitle, splitAnswerText } from '../src/lib/citations.ts';
 import { finalizeSynthesis, type RawSynthesisResult } from '../src/lib/ai/pipeline.ts';
-import { ANSWER_SYSTEM, answerUser } from '../src/lib/ai/prompts.ts';
+import { ANSWER_SYSTEM, PLANNER_SYSTEM, answerUser } from '../src/lib/ai/prompts.ts';
+import { TURATH_SEARCH_FIXTURE } from '../src/lib/dev/fixtures.ts';
 import { buildTurathUrl } from '../src/lib/search/turath.ts';
 import {
   TUA_KEY_NAMES,
@@ -17,7 +18,8 @@ import {
   resolveOpenRouterKey,
 } from '../src/lib/env.ts';
 import { neutralizeInstructions, safeSourceUrl, toPlainText, toSnippet } from '../src/lib/security/sanitize.ts';
-import { matchMadhhab } from '../src/lib/search/madhhab.ts';
+import { filterByMadhhab, matchMadhhab } from '../src/lib/search/madhhab.ts';
+import { searchAllSources } from '../src/lib/search/orchestrator.ts';
 import { dedupe, normalizeArabic, scoreEvidence, tokens } from '../src/lib/search/rank.ts';
 import type { Evidence } from '../src/lib/types.ts';
 
@@ -70,27 +72,52 @@ test('neutralizeInstructions يكسر أنماط الأوامر داخل نص ا
 
 /* ———————————— المذهب ———————————— */
 
-test('matchMadhhab لا يصنّف شيئًا بلا سند من المصدر', () => {
-  assert.equal(matchMadhhab('hanbali', undefined, undefined), null);
-  assert.equal(matchMadhhab('hanbali', 'كتب عامة', 'مؤرخ ورحّالة'), null);
+test('matchMadhhab لا يصنّف شيئًا بلا cat_id الرسمي من تراث', () => {
+  assert.equal(matchMadhhab('hanbali', undefined), null);
+  assert.equal(matchMadhhab('hanbali', 11), null);
 });
 
-test('matchMadhhab يعتمد تصنيف المصدر عند تطابقه', () => {
-  const m = matchMadhhab('hanbali', 'الفقه الحنبلي', undefined);
+test('matchMadhhab يعتمد cat_id الرسمي المطابق فقط', () => {
+  const m = matchMadhhab('hanbali', 17);
   assert.ok(m);
-  assert.equal(m.basis, 'source-category');
+  assert.equal(m.basis, 'turath-category');
+  assert.equal(m.categoryId, 17);
   assert.equal(m.madhhab, 'hanbali');
 });
 
-test('matchMadhhab يعتمد ترجمة المؤلف من المصدر كسند ثانوي', () => {
-  const m = matchMadhhab('hanafi', undefined, 'حسام الدين السغناقي: فقيه حنفي أصولي نحوي.');
-  assert.ok(m);
-  assert.equal(m.basis, 'source-author-bio');
-  assert.ok(m.basisText.includes('حنفي'));
+test('فلتر الحنفي يحذف كل نتيجة غير مصنفة رسميًا بالمعرّف 14', () => {
+  const rows = [
+    { catId: 14, key: 'hanafi' },
+    { catId: 15, key: 'maliki' },
+    { catId: 11, key: 'author-may-look-hanafi' },
+    { key: 'unknown' },
+  ];
+  assert.deepEqual(filterByMadhhab(rows, 'hanafi').map((row) => row.key), ['hanafi']);
 });
 
-test('matchMadhhab يُرجع null عند اختيار «جميع المصادر»', () => {
-  assert.equal(matchMadhhab('all', 'الفقه الشافعي', undefined), null);
+test('إلغاء فلتر المذهب يعيد النتائج كلها بلا حذف أو إعادة تصنيف', () => {
+  const rows = [{ catId: 14 }, { catId: 15 }, { catId: 11 }, {}];
+  assert.deepEqual(filterByMadhhab(rows, 'all'), rows);
+  assert.equal(matchMadhhab('all', 16), null);
+});
+
+test('التكامل: فلتر الحنفي لا يقبل مؤلفًا حنفيًا بلا cat_id=14، وإلغاؤه يعيد النتائج', async () => {
+  const previous = process.env.HUJJAH_DEV_FIXTURES;
+  process.env.HUJJAH_DEV_FIXTURES = 'true';
+  try {
+    // العينة الحقيقية تتضمن كتابًا لمؤلف تصفه ترجمة تراث بأنه حنفي، لكن
+    // cat_id للنتيجة ليس 14؛ لذلك يجب أن تختفي كل النتائج في الفلتر الحنفي.
+    const hanafi = await searchAllSources(['النية في الوضوء'], 'hanafi');
+    assert.equal(hanafi.evidence.length, 0);
+    assert.equal(hanafi.statuses[0]!.status, 'empty');
+
+    const all = await searchAllSources(['النية في الوضوء'], 'all');
+    assert.ok(all.evidence.length > 0);
+    assert.ok(all.evidence.some((item) => item.categoryId !== 14));
+  } finally {
+    if (previous === undefined) delete process.env.HUJJAH_DEV_FIXTURES;
+    else process.env.HUJJAH_DEV_FIXTURES = previous;
+  }
 });
 
 /* ———————————— الترتيب ———————————— */
@@ -119,17 +146,23 @@ function ev(partial: Partial<Evidence>): Omit<Evidence, 'score'> {
   } as Omit<Evidence, 'score'>;
 }
 
-test('scoreEvidence يرفع المطابق للمذهب المسنَد من المصدر', () => {
+test('scoreEvidence لا يرفع ترتيب المذهب؛ الإقصاء يحدث قبل الترتيب', () => {
   const q = tokens('النية في الوضوء');
-  const plain = scoreEvidence(ev({ text: 'النية في الوضوء واجبة عند الجمهور وقد اختلفوا في ذلك.' }), q);
+  const text = 'النية في الوضوء واجبة عند الجمهور وقد اختلفوا في ذلك.';
+  const plain = scoreEvidence(ev({ text }), q);
   const matched = scoreEvidence(
     ev({
-      text: 'النية في الوضوء واجبة عند الجمهور وقد اختلفوا في ذلك.',
-      madhhabMatch: { madhhab: 'hanbali', basis: 'source-category', basisText: 'الفقه الحنبلي' },
+      text,
+      madhhabMatch: {
+        madhhab: 'hanbali',
+        basis: 'turath-category',
+        categoryId: 17,
+        basisText: 'الفقه الحنبلي',
+      },
     }),
     q,
   );
-  assert.ok(matched > plain);
+  assert.equal(matched, plain);
 });
 
 test('scoreEvidence يرفع المقطع المحدَّد الموضع', () => {
@@ -178,6 +211,7 @@ test('citationLabel يبني الإحالة من بيانات المصدر فق�
   );
   assert.equal(citationLabel({ bookTitle: 'المغني', volume: '2' }), 'المغني جـ2');
   assert.equal(citationLabel({ bookTitle: 'المغني', page: 145 }), 'المغني ص145');
+  assert.equal(citationLabel({ bookTitle: 'المغني', pageId: 280 }), 'المغني · موضع 280');
   assert.equal(citationLabel({ bookTitle: 'المغني' }), 'المغني');
 });
 
@@ -216,43 +250,108 @@ test('splitAnswerText يترك الأقواس غير الاستشهادية نص
 /* ———————————— رابط الموضع الدقيق في تراث ———————————— */
 
 test('buildTurathUrl يربط بمعرّف الصفحة الحقيقي ولا يفتح بداية الكتاب', () => {
-  assert.equal(buildTurathUrl(97808, 280, true), 'https://app.turath.io/book/97808/280');
-  assert.equal(buildTurathUrl(97808, undefined, true), null);
-  assert.equal(buildTurathUrl(97808, undefined, false), 'https://app.turath.io/book/97808');
-  assert.equal(buildTurathUrl(97808, 0, true), null);
+  assert.equal(buildTurathUrl(97808, 280), 'https://app.turath.io/book/97808/280');
+  assert.equal(buildTurathUrl(97808, undefined), null);
+  assert.equal(buildTurathUrl(undefined, 280), null);
+  assert.equal(buildTurathUrl(97808, 0), null);
+});
+
+test('كل موضع في عينة تراث المحفوظة ينتج رابطًا مباشرًا مطابقًا لمعرّفاتها', () => {
+  for (const hit of TURATH_SEARCH_FIXTURE.data) {
+    const meta = JSON.parse(hit.meta) as { page_id?: number };
+    const url = buildTurathUrl(hit.book_id, meta.page_id);
+    assert.equal(url, `https://app.turath.io/book/${hit.book_id}/${meta.page_id}`);
+  }
 });
 
 /* ———————————— طبقة فهم الأدلة وتوليد الإجابة ———————————— */
 
-const synthesisEvidence = [{ id: 'ن1' }, { id: 'ن2' }, { id: 'ن3' }];
+// نصوص الاختبارات أدناه مأخوذة من عينة تراث الحقيقية المحفوظة في المشروع،
+// وليست نصوصًا شرعية منشأة للاختبار.
+const fixtureTexts = TURATH_SEARCH_FIXTURE.data.map((hit) => hit.text);
+const synthesisEvidence = [
+  { id: 'ن1', text: fixtureTexts[0]! },
+  { id: 'ن2', text: fixtureTexts[2]! },
+];
+
+function cite(evidenceId: string, quote: string) {
+  return { evidenceId, quote };
+}
 
 function rawSynthesis(partial: Partial<RawSynthesisResult>): RawSynthesisResult {
   return {
     coverage: 'complete',
-    answer: 'تثبت الأدلة هذا الحكم بوضوح. [ن1]',
-    claims: [{ text: 'تثبت الأدلة هذا الحكم بوضوح.', evidenceIds: ['ن1'] }],
+    sections: [{
+      heading: 'الجواب',
+      paragraphs: [{
+        text: 'ذهب جماهير العلماء إلى إيجاب النية في الوضوء والغسل.',
+        citations: [cite('ن1', 'ذهب جماهير العلماء إلى إيجاب النيّة في الوضوء والغسل')],
+      }],
+    }],
     disagreements: [],
     limitations: [],
     ...partial,
   };
 }
 
-test('الصياغة تقبل جوابًا دلاليًا موثقًا ولو لم يكرر ألفاظ السؤال', () => {
+test('سؤال بصياغة مختلفة يُجاب عنه دلاليًا مع شاهد حرفي حقيقي', () => {
   const result = finalizeSynthesis(
-    rawSynthesis({ answer: 'نعم؛ يدل النص على الجواز من جهة إباحته للفعل المذكور. [ن1]' }),
+    rawSynthesis({
+      sections: [{
+        heading: 'قول الحنفية',
+        paragraphs: [{
+          text: 'بحسب المقطع، يرى عامة الأحناف أن النية في الوضوء سنة.',
+          citations: [cite('ن1', 'وعند عامة الأحناف أن النية في الوضوء سنّة')],
+        }],
+      }],
+    }),
     synthesisEvidence,
   );
   assert.equal(result.insufficient, false);
   assert.equal(result.coverage, 'complete');
   assert.deepEqual(result.usedIds, ['ن1']);
+  assert.deepEqual(result.answerSections[0]!.paragraphs[0]!.evidenceIds, ['ن1']);
+});
+
+test('إجابة من مصدر واحد تبقى موثقة في خريطة الفقرة', () => {
+  const result = finalizeSynthesis(rawSynthesis({}), synthesisEvidence);
+  assert.equal(result.claims.length, 1);
+  assert.deepEqual(result.claims[0]!.evidenceIds, ['ن1']);
+  assert.match(result.answer!, /\[ن1\]/);
+});
+
+test('يجمع عدة مقاطع ومصادر في أقسام وفقرات مستقلة', () => {
+  const result = finalizeSynthesis(
+    rawSynthesis({
+      sections: [
+        {
+          heading: 'قول الجمهور',
+          paragraphs: [{
+            text: 'ذكر المقطع إيجاب النية في الوضوء والغسل عند جماهير العلماء.',
+            citations: [cite('ن1', 'ذهب جماهير العلماء إلى إيجاب النيّة في الوضوء والغسل')],
+          }],
+        },
+        {
+          heading: 'دلالة المقطع الآخر',
+          paragraphs: [{
+            text: 'شرح المقطع الآخر أن الصلاة تستغني عن كون الوضوء منويًا.',
+            citations: [cite('ن2', 'وتستغني الصلاة عن وجود النية في الوضوء')],
+          }],
+        },
+      ],
+    }),
+    synthesisEvidence,
+  );
+  assert.equal(result.answerSections.length, 2);
+  assert.deepEqual(result.usedIds, ['ن1', 'ن2']);
+  assert.equal(result.claims.length, 2);
 });
 
 test('الصياغة تحافظ على الجواب الجزئي وتوضح حدود ما لم تثبته الأدلة', () => {
   const result = finalizeSynthesis(
     rawSynthesis({
       coverage: 'partial',
-      answer: 'تثبت المقاطع أصل القول في المسألة. [ن1]',
-      limitations: ['لا تثبت المقاطع ترتيب الأقوال زمنيًا، فلا يمكن وصفه بأنه آخر قول.'],
+      limitations: ['لا تثبت المقاطع ترتيب الأقوال زمنيًا.'],
     }),
     synthesisEvidence,
   );
@@ -261,55 +360,114 @@ test('الصياغة تحافظ على الجواب الجزئي وتوضح حد
   assert.match(result.limitations[0]!, /ترتيب الأقوال/);
 });
 
-test('الصياغة تحفظ الأقوال المختلفة منفصلة مع دليل كل قول', () => {
+test('الصياغة تحفظ الأقوال المختلفة منفصلة مع شاهد كل قول', () => {
   const result = finalizeSynthesis(
     rawSynthesis({
-      answer: 'في المسألة خلاف: يثبت المقطع الأول الوجوب [ن1]، ويثبت الثاني عدم الوجوب [ن2].',
+      sections: [{
+        heading: 'الخلاف',
+        paragraphs: [{
+          text: 'نقل المقطع قول الجمهور بالإيجاب، وقول عامة الأحناف بالسنية.',
+          citations: [
+            cite('ن1', 'ذهب جماهير العلماء إلى إيجاب النيّة في الوضوء والغسل'),
+            cite('ن1', 'وعند عامة الأحناف أن النية في الوضوء سنّة'),
+          ],
+        }],
+      }],
       disagreements: [{
-        topic: 'حكم المسألة',
+        topic: 'النية في الوضوء',
         positions: [
-          { position: 'الوجوب', evidenceIds: ['ن1'] },
-          { position: 'عدم الوجوب', evidenceIds: ['ن2'] },
+          {
+            position: 'الإيجاب عند جماهير العلماء.',
+            citations: [cite('ن1', 'ذهب جماهير العلماء إلى إيجاب النيّة في الوضوء والغسل')],
+          },
+          {
+            position: 'السنية عند عامة الأحناف.',
+            citations: [cite('ن1', 'وعند عامة الأحناف أن النية في الوضوء سنّة')],
+          },
         ],
       }],
     }),
     synthesisEvidence,
   );
   assert.equal(result.disagreements.length, 1);
-  assert.deepEqual(result.usedIds, ['ن1', 'ن2']);
+  assert.equal(result.disagreements[0]!.positions.length, 2);
 });
 
-test('الصياغة لا تعرض جوابًا بلا أساس أو بلا استشهاد حقيقي', () => {
+test('لا يعرض جوابًا عندما لا توجد أدلة كافية', () => {
   const none = finalizeSynthesis(
-    rawSynthesis({ coverage: 'none', answer: '', claims: [], limitations: [] }),
+    rawSynthesis({ coverage: 'none', sections: [], disagreements: [], limitations: [] }),
     synthesisEvidence,
   );
   assert.equal(none.insufficient, true);
   assert.equal(none.answer, null);
-
-  const invented = finalizeSynthesis(
-    rawSynthesis({ answer: 'جواب يبدو كاملًا لكنه يعتمد على إحالة مختلقة. [ن99]' }),
-    synthesisEvidence,
-  );
-  assert.equal(invented.insufficient, true);
-  assert.equal(invented.answer, null);
-
-  const uncitedParagraph = finalizeSynthesis(
-    rawSynthesis({ answer: 'هذه فقرة موثقة بما أعاده المصدر. [ن1]\nوهذه دعوى أخرى تركها النموذج بلا دليل.' }),
-    synthesisEvidence,
-  );
-  assert.equal(uncitedParagraph.insufficient, true);
+  assert.deepEqual(none.answerSections, []);
 });
 
-test('تعليمات النموذج تفرض الفهم الدلالي والجزئية والخلاف وضبط آخر قول', () => {
+test('يرفض Citation وهميًا: معرّف غير موجود أو شاهد غير موجود في المقطع', () => {
+  const inventedId = finalizeSynthesis(
+    rawSynthesis({
+      sections: [{
+        heading: 'ادعاء',
+        paragraphs: [{
+          text: 'فقرة ذات معرّف مختلق.',
+          citations: [cite('ن99', 'ذهب جماهير العلماء إلى إيجاب النيّة في الوضوء والغسل')],
+        }],
+      }],
+    }),
+    synthesisEvidence,
+  );
+  assert.equal(inventedId.insufficient, true);
+
+  const inventedQuote = finalizeSynthesis(
+    rawSynthesis({
+      sections: [{
+        heading: 'ادعاء',
+        paragraphs: [{
+          text: 'فقرة ذات شاهد غير موجود.',
+          citations: [cite('ن1', 'هذا شاهد مختلق لا يوجد في نص تراث المسترجع')],
+        }],
+      }],
+    }),
+    synthesisEvidence,
+  );
+  assert.equal(inventedQuote.insufficient, true);
+});
+
+test('يسقط الفقرة غير الموثقة ويخفض الإجابة إلى جزئية بدل تمريرها', () => {
+  const result = finalizeSynthesis(
+    rawSynthesis({
+      sections: [{
+        heading: 'النتيجة',
+        paragraphs: [
+          {
+            text: 'فقرة صحيحة الربط.',
+            citations: [cite('ن1', 'وعند عامة الأحناف أن النية في الوضوء سنّة')],
+          },
+          {
+            text: 'فقرة بلا شاهد فعلي.',
+            citations: [cite('ن1', 'عبارة غير موجودة أبدًا داخل المقطع الحقيقي')],
+          },
+        ],
+      }],
+    }),
+    synthesisEvidence,
+  );
+  assert.equal(result.insufficient, false);
+  assert.equal(result.coverage, 'partial');
+  assert.equal(result.claims.length, 1);
+  assert.match(result.limitations.join(' '), /استُبعدت فقرة/);
+});
+
+test('تعليمات النموذج تفرض الدمج والفهم الدلالي والشاهد الحرفي والخلاف', () => {
   const prompt = answerUser('هل يصح هذا الفعل وما آخر كلام العلماء فيه؟', 'all', [{
-    id: 'ن1', sourceLabel: 'تراث', bookTitle: 'كتاب', text: 'نص الدليل المتاح',
+    id: 'ن1', sourceLabel: 'تراث', bookTitle: 'كتاب', text: fixtureTexts[0]!,
   }]);
   assert.match(ANSWER_SYSTEM, /لا يلزم التطابق الحرفي/);
-  assert.match(ANSWER_SYSTEM, /coverage="partial"/);
-  assert.match(ANSWER_SYSTEM, /آخر كلام/);
+  assert.match(ANSWER_SYSTEM, /اقرأ المقاطع كلها/);
+  assert.match(ANSWER_SYSTEM, /quote قصيرًا منسوخًا حرفيًا/);
   assert.match(ANSWER_SYSTEM, /عند اختلاف الأقوال/);
-  assert.match(prompt, /حلّل دلالة النصوص لا مجرد تطابق الكلمات/);
+  assert.match(prompt, /واجمع الأجزاء المتفرقة/);
+  assert.match(PLANNER_SYSTEM, /حتى خمسة للسؤال المركّب/);
 });
 
 /* ———————————— قراءة البيئة والمفتاح ———————————— */

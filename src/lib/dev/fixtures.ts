@@ -93,16 +93,3 @@ export const TURATH_SEARCH_FIXTURE = {
     },
   ],
 };
-
-/** يحاكي /book للكتب الواردة أعلاه — بتصنيفات تراث الحقيقية لها. */
-export const TURATH_BOOK_CATEGORY_FIXTURE: Record<number, string | undefined> = {
-  97808: 'الرقاق والآداب والأذكار',
-  147671: undefined,
-  16526: undefined,
-  122256: undefined,
-};
-
-/** يحاكي /author — مقتطف حرفي من ترجمة تراث. */
-export const TURATH_AUTHOR_BIO_FIXTURE: Record<number, string> = {
-  2768: 'حسام الدين السِّغْنَاقي: فقيه حنفي أصولي نحوي. نِسبته إلى سِغْنَاق، وهي بلدة في تركستان.',
-};

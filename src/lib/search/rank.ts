@@ -26,8 +26,8 @@ export function tokens(s: string): string[] {
 }
 
 /**
- * ترتيب المقطع بناءً على تغطية كلمات السؤال، مع ترجيح المذهب
- * عندما يكون مسنَدًا إلى بيانات المصدر فقط.
+ * ترتيب المقطع بناءً على تغطية كلمات السؤال وتوفر موضع التوثيق.
+ * فلتر المذهب يُطبّق إقصائيًا قبل هذه المرحلة، فلا يدخل في الدرجة.
  */
 export function scoreEvidence(ev: Omit<Evidence, 'score'>, queryTokens: string[]): number {
   const hay = normalizeArabic(`${ev.bookTitle} ${(ev.headings ?? []).join(' ')} ${ev.snippet ?? ''} ${ev.text}`);
@@ -54,11 +54,6 @@ export function scoreEvidence(ev: Omit<Evidence, 'score'>, queryTokens: string[]
   // توفّر الموضع الدقيق يرفع قيمة الدليل للتوثيق
   if (ev.page !== undefined) score += 0.5;
   if (ev.volume !== undefined) score += 0.2;
-
-  // ترجيح المذهب — فقط عند وجود سند من المصدر
-  if (ev.madhhabMatch) {
-    score += ev.madhhabMatch.basis === 'source-category' ? 2.5 : 1.2;
-  }
 
   return Math.round(score * 100) / 100;
 }

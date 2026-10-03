@@ -1,6 +1,14 @@
 import { config } from '@/lib/config';
 import { neutralizeInstructions, toPlainText } from '@/lib/security/sanitize';
-import { SOURCE_LABEL, type AnswerClaim, type Disagreement, type Evidence, type Madhhab } from '@/lib/types';
+import { normalizeArabic } from '@/lib/search/rank';
+import {
+  SOURCE_LABEL,
+  type AnswerClaim,
+  type AnswerSection,
+  type Disagreement,
+  type Evidence,
+  type Madhhab,
+} from '@/lib/types';
 import { generateJson } from './openrouter.ts';
 import {
   ANSWER_SCHEMA,
@@ -74,18 +82,38 @@ export async function planSearch(
 
 export type EvidenceCoverage = 'complete' | 'partial' | 'none';
 
+/** شاهد يطلب من النموذج نسخه حرفيًا، ثم يتحقق منه الخادم. */
+export interface RawCitationAnchor {
+  evidenceId: string;
+  quote: string;
+}
+
+export interface RawAnswerParagraph {
+  text: string;
+  citations: RawCitationAnchor[];
+}
+
+export interface RawAnswerSection {
+  heading: string;
+  paragraphs: RawAnswerParagraph[];
+}
+
 export interface RawSynthesisResult {
   coverage: EvidenceCoverage;
-  answer: string;
-  claims: AnswerClaim[];
-  disagreements: Disagreement[];
+  sections: RawAnswerSection[];
+  disagreements: Array<{
+    topic: string;
+    positions: Array<{ position: string; citations: RawCitationAnchor[] }>;
+  }>;
   limitations: string[];
 }
 
 export interface SynthesisResult {
   insufficient: boolean;
   coverage: EvidenceCoverage;
+  /** نص مشتق من البنية الموثقة، لا نص حر مستقل من النموذج. */
   answer: string | null;
+  answerSections: AnswerSection[];
   claims: AnswerClaim[];
   disagreements: Disagreement[];
   /** حدود ما لم تستطع الأدلة إثباته في الإجابة الجزئية. */
@@ -111,94 +139,129 @@ function toPromptEvidence(evidence: Evidence[]): EvidenceForPrompt[] {
   }));
 }
 
-/**
- * يحذف أي استشهاد بمعرّف غير موجود ضمن الأدلة المسلَّمة للنموذج.
- * هذه هي الحماية الأخيرة ضد نسبة كلام إلى مصدر لم يُعطَ للنموذج.
- */
-function sanitizeCitations(
-  raw: RawSynthesisResult,
-  validIds: Set<string>,
-): { claims: AnswerClaim[]; disagreements: Disagreement[] } {
-  const claims: AnswerClaim[] = (raw.claims ?? [])
-    .map((c) => ({
-      text: toPlainText(c.text, 1200),
-      evidenceIds: (c.evidenceIds ?? []).filter((id) => validIds.has(id)),
-    }))
-    .filter((c) => c.text.length > 0 && c.evidenceIds.length > 0);
-
-  const disagreements: Disagreement[] = (raw.disagreements ?? [])
-    .map((d) => {
-      const positions = (d.positions ?? [])
-        .map((p) => ({
-          position: toPlainText(p.position, 800),
-          evidenceIds: (p.evidenceIds ?? []).filter((id) => validIds.has(id)),
-        }))
-        .filter((p) => p.position.length > 0 && p.evidenceIds.length > 0);
-      return { topic: toPlainText(d.topic, 300), positions };
-    })
-    .filter((d) => d.topic.length > 0 && d.positions.length >= 2);
-
-  return { claims, disagreements };
-}
-
-/** يزيل من نص الإجابة أي إشارة [نX] لا تقابل دليلًا حقيقيًا. */
-function stripInvalidRefs(answer: string, validIds: Set<string>): string {
-  return answer
-    .replace(/\[([^\]\n]{1,80})\]/g, (match, inner: string) => {
-      const ids = inner
-        .split(/[,،؛;\s]+/)
-        .map((s) => s.trim())
-        .filter(Boolean);
-      const kept = ids.filter((id) => validIds.has(id));
-      if (kept.length === 0) return ids.every((id) => /^ن\d+$/.test(id)) ? '' : match;
-      return `[${kept.join('، ')}]`;
-    })
-    .replace(/[ \t]{2,}/g, ' ')
-    .replace(/\s+([.،؛:])/g, '$1')
+/** يمنع النموذج من تمرير إحالات نصية تتجاوز خريطة الخادم. */
+function cleanGeneratedText(value: unknown, maxChars: number): string {
+  return toPlainText(value, maxChars)
+    .replace(/\[\s*ن\d+(?:\s*[,،؛;]\s*ن\d+)*\s*\]/g, '')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
-/** يستخرج المعرّفات الحقيقية الظاهرة فعلًا داخل نص الإجابة. */
-function inlineEvidenceIds(answer: string, validIds: Set<string>): string[] {
-  const used = new Set<string>();
-  for (const match of answer.matchAll(/\[([^\]\n]{1,80})\]/g)) {
-    for (const id of match[1]!.split(/[,،؛;\s]+/).map((s) => s.trim())) {
-      if (validIds.has(id)) used.add(id);
-    }
+/**
+ * تحقق حتمي من الشاهد: لا يُقبل المعرّف وحده. يجب أن ينسخ النموذج عبارة
+ * موجودة فعلًا داخل نص ذلك المقطع. نطبّع التشكيل والمسافات للمقارنة فقط.
+ */
+function verifiedEvidenceIds(
+  anchors: RawCitationAnchor[] | undefined,
+  evidenceById: Map<string, Pick<Evidence, 'id' | 'text'>>,
+): string[] {
+  if (!Array.isArray(anchors)) return [];
+  const ids = new Set<string>();
+
+  for (const anchor of anchors) {
+    if (!anchor || typeof anchor.evidenceId !== 'string' || typeof anchor.quote !== 'string') continue;
+    const evidence = evidenceById.get(anchor.evidenceId);
+    if (!evidence) continue;
+
+    const quote = normalizeArabic(toPlainText(anchor.quote, 600));
+    // شاهد قصير جدًا لا يكفي لإثبات ارتباط فعلي، ولو صادف وجود كلمة عامة.
+    if (quote.length < 12 || quote.split(' ').filter(Boolean).length < 2) continue;
+    const sourceText = normalizeArabic(evidence.text);
+    if (!sourceText.includes(quote)) continue;
+    ids.add(anchor.evidenceId);
   }
-  return [...used];
+
+  return [...ids];
+}
+
+function sanitizeSections(
+  rawSections: RawAnswerSection[] | undefined,
+  evidenceById: Map<string, Pick<Evidence, 'id' | 'text'>>,
+): { sections: AnswerSection[]; rawParagraphCount: number } {
+  if (!Array.isArray(rawSections)) return { sections: [], rawParagraphCount: 0 };
+  let rawParagraphCount = 0;
+  const sections: AnswerSection[] = [];
+
+  for (const rawSection of rawSections.slice(0, 10)) {
+    if (!rawSection || !Array.isArray(rawSection.paragraphs)) continue;
+    const paragraphs: AnswerClaim[] = [];
+
+    for (const rawParagraph of rawSection.paragraphs.slice(0, 8)) {
+      rawParagraphCount += 1;
+      const text = cleanGeneratedText(rawParagraph?.text, 1600);
+      const evidenceIds = verifiedEvidenceIds(rawParagraph?.citations, evidenceById);
+      if (!text || evidenceIds.length === 0) continue;
+      paragraphs.push({ text, evidenceIds });
+    }
+
+    if (paragraphs.length === 0) continue;
+    const heading = cleanGeneratedText(rawSection.heading, 180);
+    sections.push({ heading: heading || undefined, paragraphs });
+  }
+
+  return { sections, rawParagraphCount };
+}
+
+function sanitizeDisagreements(
+  raw: RawSynthesisResult['disagreements'] | undefined,
+  evidenceById: Map<string, Pick<Evidence, 'id' | 'text'>>,
+): Disagreement[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .slice(0, 6)
+    .map((disagreement) => {
+      const positions = Array.isArray(disagreement?.positions)
+        ? disagreement.positions
+            .slice(0, 8)
+            .map((position) => ({
+              position: cleanGeneratedText(position?.position, 900),
+              evidenceIds: verifiedEvidenceIds(position?.citations, evidenceById),
+            }))
+            .filter((position) => position.position.length > 0 && position.evidenceIds.length > 0)
+        : [];
+      return { topic: cleanGeneratedText(disagreement?.topic, 300), positions };
+    })
+    .filter((disagreement) => disagreement.topic.length > 0 && disagreement.positions.length >= 2);
+}
+
+/** يبني النص القديم/سياق المحادثة من الخريطة الموثقة؛ النموذج لا يتحكم بالإحالات الظاهرة. */
+function sectionsToAnswer(sections: AnswerSection[]): string {
+  return sections
+    .map((section) => {
+      const heading = section.heading ? `${section.heading}\n` : '';
+      const paragraphs = section.paragraphs
+        .map((paragraph) => `${paragraph.text} [${paragraph.evidenceIds.join('، ')}]`)
+        .join('\n');
+      return `${heading}${paragraphs}`;
+    })
+    .join('\n\n')
+    .trim();
 }
 
 /**
- * الحاجز البرمجي بعد النموذج: لا يسمح بإجابة بلا استشهاد ظاهر حقيقي،
- * ويحافظ على الإجابة الجزئية بدل إسقاطها ما دامت مبنية على دليل.
+ * الحاجز البرمجي بعد النموذج:
+ * - لا فقرة بلا معرّف موجود وشاهد حرفي موجود داخل نص تراث.
+ * - لا إحالة نصية حرّة من النموذج؛ النص النهائي يُبنى هنا من الخريطة.
+ * - إسقاط أي فقرة فاشلة يخفض التغطية إلى «جزئية» بدل إخفاء النقص.
  */
 export function finalizeSynthesis(
   raw: RawSynthesisResult,
-  evidence: Pick<Evidence, 'id'>[],
+  evidence: Pick<Evidence, 'id' | 'text'>[],
 ): SynthesisResult {
-  const validIds = new Set(evidence.map((e) => e.id));
-  const { claims, disagreements } = sanitizeCitations(raw, validIds);
-  const answer = stripInvalidRefs(toPlainText(raw.answer, 8000), validIds);
-  const inlineIds = inlineEvidenceIds(answer, validIds);
-  const paragraphs = answer.split(/\n+/).map((p) => p.trim()).filter(Boolean);
-  const everyParagraphCited = paragraphs.length > 0
-    && paragraphs.every((p) => inlineEvidenceIds(p, validIds).length > 0);
-  const coverage: EvidenceCoverage =
+  const evidenceById = new Map(evidence.map((item) => [item.id, item]));
+  const { sections, rawParagraphCount } = sanitizeSections(raw.sections, evidenceById);
+  const claims = sections.flatMap((section) => section.paragraphs);
+  const disagreements = sanitizeDisagreements(raw.disagreements, evidenceById);
+
+  const declaredCoverage: EvidenceCoverage =
     raw.coverage === 'complete' || raw.coverage === 'partial' ? raw.coverage : 'none';
 
-  // claims حقل تدقيق، لكنه لا يعوّض الإحالة المرئية القابلة للنقر داخل الجواب.
-  // كذلك نرفض فقرة موضوعية كاملة تركها النموذج بلا أي إحالة.
-  const insufficient = coverage === 'none'
-    || answer.length < 20
-    || inlineIds.length === 0
-    || claims.length === 0
-    || !everyParagraphCited;
-  if (insufficient) {
+  if (declaredCoverage === 'none' || claims.length === 0) {
     return {
       insufficient: true,
       coverage: 'none',
       answer: null,
+      answerSections: [],
       claims: [],
       disagreements: [],
       limitations: [],
@@ -206,21 +269,35 @@ export function finalizeSynthesis(
     };
   }
 
+  const droppedUnsupportedParagraph = rawParagraphCount > claims.length;
+  const coverage: EvidenceCoverage =
+    declaredCoverage === 'complete' && droppedUnsupportedParagraph ? 'partial' : declaredCoverage;
   const limitations = coverage === 'partial'
-    ? (raw.limitations ?? []).map((v) => toPlainText(v, 600)).filter(Boolean).slice(0, 4)
+    ? (Array.isArray(raw.limitations) ? raw.limitations : [])
+        .map((value) => cleanGeneratedText(value, 700))
+        .filter(Boolean)
+        .slice(0, 5)
     : [];
-  // استشهادات قسم الخلاف ظاهرة وقابلة للنقر أيضًا، فنحتفظ بأدلتها للواجهة.
-  const displayedIds = new Set(inlineIds);
-  disagreements.forEach((d) => d.positions.forEach((p) => p.evidenceIds.forEach((id) => displayedIds.add(id))));
+
+  if (droppedUnsupportedParagraph) {
+    limitations.push('استُبعدت فقرة أو أكثر لأن شاهدها لم يطابق نص المقطع المسترجع من تراث.');
+  }
+
+  const used = new Set<string>();
+  claims.forEach((claim) => claim.evidenceIds.forEach((id) => used.add(id)));
+  disagreements.forEach((item) =>
+    item.positions.forEach((position) => position.evidenceIds.forEach((id) => used.add(id))),
+  );
 
   return {
     insufficient: false,
     coverage,
-    answer,
+    answer: sectionsToAnswer(sections),
+    answerSections: sections,
     claims,
     disagreements,
-    limitations,
-    usedIds: [...displayedIds],
+    limitations: [...new Set(limitations)],
+    usedIds: [...used],
   };
 }
 
@@ -235,6 +312,7 @@ export async function synthesizeAnswer(
       insufficient: true,
       coverage: 'none',
       answer: null,
+      answerSections: [],
       claims: [],
       disagreements: [],
       limitations: [],
@@ -247,7 +325,7 @@ export async function synthesizeAnswer(
     user: answerUser(question, madhhab, toPromptEvidence(evidence)),
     schema: ANSWER_SCHEMA as unknown as Record<string, unknown>,
     temperature: 0.1,
-    maxOutputTokens: 3000,
+    maxOutputTokens: 5000,
     signal,
   });
 

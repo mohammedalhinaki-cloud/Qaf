@@ -1,9 +1,9 @@
 import { config } from '@/lib/config';
 import type { Evidence, Madhhab, SourceStatus } from '@/lib/types';
 import { MADHHAB_LABEL } from '@/lib/types';
-import { matchMadhhab } from './madhhab';
-import { dedupe, scoreEvidence, tokens } from './rank';
-import { getTurathAuthorBio, getTurathBookCategory, searchTurath } from './turath';
+import { filterByMadhhab, matchMadhhab, turathMadhhabCategoryLabel } from './madhhab.ts';
+import { dedupe, scoreEvidence, tokens } from './rank.ts';
+import { searchTurath } from './turath.ts';
 
 export interface SearchOutcome {
   evidence: Evidence[];
@@ -19,9 +19,10 @@ function errMessage(e: unknown): string {
 }
 
 /**
- * ينفّذ البحث في تراث (المصدر الوحيد) على كل الاستعلامات،
- * ثم يوحّد النتائج ويرتّبها. عند تعذّر الوصول تُسجَّل الحالة
- * وتُعرض للمستخدم — ولا تُلفَّق أي نتيجة.
+ * ينفّذ البحث النصي المعتاد في تراث على كل الاستعلامات ثم يعالج النتائج.
+ * فلتر المذهب هنا إقصائي بالكامل، لكنه لا يغيّر بحث تراث ولا بياناته:
+ * نفحص فقط `cat_id` الموجود في كل نتيجة ونحذف كل نتيجة لا تطابق القسم
+ * الرسمي للمذهب المختار. عند اختيار «الكل» لا يحدث أي فلتر مذهبي.
  */
 export async function searchAllSources(
   queries: string[],
@@ -30,8 +31,8 @@ export async function searchAllSources(
 ): Promise<SearchOutcome> {
   const limitedQueries = queries.slice(0, config.limits.maxQueries);
   const perQuery = config.limits.maxResultsPerQuery;
-
   const started = Date.now();
+
   let status: SourceStatus;
   let items: Awaited<ReturnType<typeof searchTurath>> = [];
 
@@ -47,15 +48,24 @@ export async function searchAllSources(
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), config.limits.sourceTimeoutMs);
     try {
-      for (const q of limitedQueries) {
-        const res = await searchTurath(q, { limit: perQuery, signal: controller.signal });
-        items.push(...res);
-      }
+      // الاستعلامات مستقلة؛ تشغيلها معًا يتيح جمع زوايا السؤال المركّب ضمن المهلة.
+      const batches = await Promise.all(
+        limitedQueries.map((query) => searchTurath(query, { limit: perQuery, signal: controller.signal })),
+      );
+      items = batches.flat();
+
+      // هذه هي نقطة الفلترة الوحيدة. لا أسماء كتب، ولا أسماء مؤلفين، ولا تراجم.
+      items = filterByMadhhab(items, madhhab);
+
       status = {
         source: 'turath',
         status: items.length > 0 ? 'ok' : 'empty',
         count: items.length,
         tookMs: Date.now() - started,
+        message:
+          items.length === 0 && madhhab !== 'all'
+            ? `لم تُرجع النتائج مصادر تحمل تصنيف تراث الرسمي للمذهب ${MADHHAB_LABEL[madhhab]}.`
+            : undefined,
       };
     } catch (e) {
       const aborted = e instanceof Error && (e.name === 'AbortError' || e.name === 'TimeoutError');
@@ -66,6 +76,7 @@ export async function searchAllSources(
         tookMs: Date.now() - started,
         message: errMessage(e),
       };
+      items = [];
     } finally {
       clearTimeout(timer);
     }
@@ -74,48 +85,27 @@ export async function searchAllSources(
   onStatus?.(status);
 
   const qTokens = tokens(limitedQueries.join(' '));
-  const collected: Evidence[] = [];
-
-  /* ——— إثراء بالتصنيف وترجمة المؤلف لتحديد موافقة المذهب ——— */
-  const enrichLimit = 14; // نحدّ من الطلبات الإضافية
-  let enriched = 0;
-  for (const row of items) {
-    let categoryLabel: string | undefined;
-    let authorBio: string | undefined;
-
-    if (madhhab !== 'all' && enriched < enrichLimit) {
-      enriched += 1;
-      if (row.bookId !== undefined) {
-        categoryLabel = await getTurathBookCategory(row.bookId).catch(() => undefined);
-      }
-      const alreadyMatched =
-        categoryLabel !== undefined && matchMadhhab(madhhab, categoryLabel, undefined) !== null;
-      if (!alreadyMatched && row.authorId !== undefined) {
-        authorBio = await getTurathAuthorBio(row.authorId).catch(() => undefined);
-      }
-    }
-
-    const base = { ...row.evidence, categoryLabel };
-    const madhhabMatch = matchMadhhab(madhhab, categoryLabel, authorBio);
+  const collected: Evidence[] = items.map((row) => {
+    const categoryId = row.catId;
+    const categoryLabel = turathMadhhabCategoryLabel(categoryId);
+    const base = { ...row.evidence, categoryId, categoryLabel };
+    const madhhabMatch = matchMadhhab(madhhab, categoryId);
     const withMatch = { ...base, madhhabMatch, id: '' };
-    collected.push({ ...withMatch, score: scoreEvidence(withMatch, qTokens) });
-  }
+    return { ...withMatch, score: scoreEvidence(withMatch, qTokens) };
+  });
 
   const ranked = dedupe(collected.sort((a, b) => b.score - a.score)).slice(
     0,
     config.limits.maxEvidence,
   );
 
-  // ترقيم الأدلة بعد الترتيب النهائي: ن1، ن2 ...
+  // ترقيم الأدلة بعد الفلترة والترتيب النهائي: ن1، ن2 ...
   const evidence = ranked.map((ev, i) => ({ ...ev, id: `ن${i + 1}` }));
-
   return { evidence, statuses: [status] };
 }
 
-/** ملاحظة عربية تصف حالة البحث للمستخدم. */
+/** ملاحظة عربية تصف أثر فلتر المذهب الحقيقي للمستخدم. */
 export function buildSourceNotice(madhhab: Madhhab): string | undefined {
-  if (madhhab !== 'all') {
-    return `فلتر المذهب (${MADHHAB_LABEL[madhhab]}) يرفع ترتيب المصادر التي صنّفتها تراث ضمن هذا المذهب، ولا يحذف غيرها.`;
-  }
-  return undefined;
+  if (madhhab === 'all') return undefined;
+  return `فلتر المذهب (${MADHHAB_LABEL[madhhab]}) إقصائي: لا تظهر إلا النتائج التي تحمل تصنيف المذهب الرسمي في بيانات تراث.`;
 }

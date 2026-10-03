@@ -46,11 +46,11 @@ export function shortBookTitle(title: string, max = 18): string {
  *   «المجموع 3/301» عند توفر الجزء والصفحة
  *   «المجموع جـ3» عند توفر الجزء فقط
  *   «المجموع ص301» عند توفر الصفحة فقط
- *   «المجموع» عند عدم توفر الموضع
+ *   «المجموع · موضع 280» عند توفر معرّف موضع تراث فقط
  * لا يُخترع أي رقم غير موجود في بيانات المصدر.
  */
 export function citationLabel(
-  ev: Pick<Evidence, 'bookTitle' | 'volume' | 'page'>,
+  ev: Pick<Evidence, 'bookTitle' | 'volume' | 'page' | 'pageId'>,
 ): string {
   const short = shortBookTitle(ev.bookTitle);
   const vol = ev.volume?.trim();
@@ -58,6 +58,7 @@ export function citationLabel(
   if (vol && page !== undefined) return `${short} ${vol}/${page}`;
   if (vol) return `${short} جـ${vol}`;
   if (page !== undefined) return `${short} ص${page}`;
+  if (ev.pageId !== undefined) return `${short} · موضع ${ev.pageId}`;
   return short;
 }
 

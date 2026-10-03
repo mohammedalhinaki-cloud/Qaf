@@ -19,11 +19,6 @@ export default function SourcesPage() {
           <p>يستفيد حُجَّة من واجهة البحث العامة في تراث للوصول إلى بيانات الكتب والمؤلفين والنصوص والمواضع الأصلية.</p>
           <a href="https://app.turath.io" rel="noopener noreferrer" className="text-ink-accent hover:underline">زيارة تراث</a>
         </section>
-        <section className="space-y-3">
-          <h2 className="text-2xl font-semibold">المكتبة الشاملة</h2>
-          <p>عند توفر الخدمة، يستخدم حُجَّة قناة القراءة الرسمية للمساعدة في البحث وفتح صفحات المصدر والتحقق من الاقتباسات.</p>
-          <a href="https://shamela.ws/page/support" rel="noopener noreferrer" className="text-ink-accent hover:underline">تعرف على خدمة الشاملة</a>
-        </section>
         <p className="border-t border-ink-line pt-5 text-sm text-ink-muted">حُجَّة أداة بحث وتوثيق، وليس مفتيًا. تحقق من المصدر في سياقه واستشر أهل الاختصاص.</p>
       </article>
     </main>

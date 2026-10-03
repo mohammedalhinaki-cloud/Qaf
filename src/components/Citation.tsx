@@ -15,7 +15,11 @@ export function CitationChip({ ev }: { ev: Evidence }) {
     ev.bookTitle,
     ev.author,
     ev.volume ? `الجزء ${ev.volume}` : null,
-    ev.page !== undefined ? `الصفحة ${ev.page}` : null,
+    ev.page !== undefined
+      ? `الصفحة ${ev.page}`
+      : ev.pageId !== undefined
+        ? `موضع تراث ${ev.pageId}`
+        : null,
   ]
     .filter(Boolean)
     .join(' · ');

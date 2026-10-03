@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { splitAnswerText } from '@/lib/citations';
-import type { AskResult, Evidence } from '@/lib/types';
+import type { AnswerSection, AskResult, Evidence } from '@/lib/types';
 import { CitationChip } from './Citation';
 import { EvidenceCard } from './EvidenceCard';
 import { IconAlert } from './icons';
@@ -50,6 +50,42 @@ function AnswerText({
   );
 }
 
+/**
+ * العرض الأساسي الجديد: لا نحلّل إحالات كتبها النموذج؛ بل نعرض خريطة
+ * الفقرة ← معرّفات الأدلة التي بناها الخادم بعد التحقق من الشواهد الحرفية.
+ */
+function StructuredAnswer({
+  sections,
+  evidenceById,
+}: {
+  sections: AnswerSection[];
+  evidenceById: Map<string, Evidence>;
+}) {
+  return (
+    <div className="space-y-5">
+      {sections.map((section, sectionIndex) => (
+        <section key={sectionIndex} className="space-y-2" aria-label={section.heading || 'فقرة من الإجابة'}>
+          {section.heading && (
+            <h3 className="text-[16px] font-bold leading-8 text-ink-text">{section.heading}</h3>
+          )}
+          <div className="prose-ar space-y-2 text-[15.5px]">
+            {section.paragraphs.map((paragraph, paragraphIndex) => (
+              <p key={paragraphIndex}>
+                <span>{paragraph.text}</span>{' '}
+                {paragraph.evidenceIds.map((id) =>
+                  evidenceById.has(id) ? (
+                    <CitationChip key={id} ev={evidenceById.get(id)!} />
+                  ) : null,
+                )}
+              </p>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
     <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-text">
@@ -82,7 +118,12 @@ export function AnswerBlock({ result }: { result: AskResult }) {
 
       {result.answer && (
         <section aria-label="الإجابة">
-          <AnswerText text={result.answer} evidenceById={evidenceById} />
+          {Array.isArray(result.answerSections) && result.answerSections.length > 0 ? (
+            <StructuredAnswer sections={result.answerSections} evidenceById={evidenceById} />
+          ) : (
+            // توافق مع المحادثات المحلية المحفوظة قبل إضافة البنية المنظمة.
+            <AnswerText text={result.answer} evidenceById={evidenceById} />
+          )}
           {result.evidence.length > 0 && (
             <p className="mt-2 text-[10.5px] leading-5 text-ink-muted">
               اضغط على أي استشهاد ملوّن لفتح موضع النص المستشهَد به مباشرة في مكتبة تراث.

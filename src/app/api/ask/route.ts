@@ -5,7 +5,7 @@ import { config } from '@/lib/config';
 import { clientKey, rateLimit } from '@/lib/security/ratelimit';
 import { ValidationError, parseAskRequest } from '@/lib/security/validate';
 import { buildSourceNotice, searchAllSources } from '@/lib/search/orchestrator';
-import { STAGE_LABEL, type AskEvent, type AskResult } from '@/lib/types';
+import { MADHHAB_LABEL, STAGE_LABEL, type AskEvent, type AskResult } from '@/lib/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -91,6 +91,7 @@ export async function POST(req: NextRequest) {
             sourceStatus: [],
             evidence: [],
             answer: null,
+            answerSections: [],
             claims: [],
             disagreements: [],
             insufficient: true,
@@ -130,6 +131,7 @@ export async function POST(req: NextRequest) {
             sourceStatus: statuses,
             evidence: [],
             answer: null,
+            answerSections: [],
             claims: [],
             disagreements: [],
             insufficient: true,
@@ -153,12 +155,15 @@ export async function POST(req: NextRequest) {
             sourceStatus: statuses,
             evidence: [],
             answer: null,
+            answerSections: [],
             claims: [],
             disagreements: [],
             insufficient: true,
             notice: disabled
               ? 'مصدر البحث (تراث) معطّل في إعدادات الخادم، لذلك لم يتم تنفيذ أي بحث.'
-              : 'لم أجد مادة كافية في مكتبة تراث عن هذا السؤال بهذه الصياغة. جرّب صياغة أدق أو مصطلحًا فقهيًا أقرب.',
+              : madhhab !== 'all'
+                ? `لم تُرجع نتائج البحث مصدرًا مصنّفًا في تراث ضمن المذهب ${MADHHAB_LABEL[madhhab]}. لم تُعرض المصادر غير المصنّفة بهذا المذهب.`
+                : 'لم أجد مادة كافية في مكتبة تراث عن هذا السؤال بهذه الصياغة. جرّب صياغة أدق أو مصطلحًا فقهيًا أقرب.',
             createdAt: Date.now(),
           };
           send({ type: 'result', result });
@@ -184,6 +189,7 @@ export async function POST(req: NextRequest) {
             sourceStatus: statuses,
             evidence: evidence.slice(0, 5),
             answer: null,
+            answerSections: [],
             claims: [],
             disagreements: [],
             insufficient: true,
@@ -225,6 +231,7 @@ export async function POST(req: NextRequest) {
           sourceStatus: statuses,
           evidence: shownEvidence,
           answer: synthesis.answer,
+          answerSections: synthesis.answerSections,
           claims: synthesis.claims,
           disagreements: synthesis.disagreements,
           coverage: synthesis.coverage,

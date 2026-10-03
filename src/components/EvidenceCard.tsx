@@ -16,6 +16,7 @@ function Locus({ ev }: { ev: Evidence }) {
   const bits: string[] = [];
   if (ev.volume) bits.push(`الجزء: ${ev.volume}`);
   if (ev.page !== undefined) bits.push(`الصفحة: ${ev.page}`);
+  else if (ev.pageId !== undefined) bits.push(`موضع تراث: ${ev.pageId}`);
   if (bits.length === 0) return <span className="text-ink-muted">الموضع غير محدَّد في بيانات المصدر</span>;
   return <span>{bits.join(' · ')}</span>;
 }

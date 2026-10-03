@@ -43,13 +43,15 @@ export interface Evidence {
   snippet?: string;
   /** رابط المصدر الأصلي خارج موقعنا */
   url: string;
-  /** تصنيف المصدر كما ورد من المصدر نفسه (لا نصنّف نحن) */
+  /** معرّف تصنيف الكتاب كما أعادته تراث (`cat_id`) */
+  categoryId?: number;
+  /** اسم تصنيف المذهب الرسمي في تراث، إن طابق أحد أقسام المذاهب */
   categoryLabel?: string;
-  /** موافقة المذهب المطلوب، وسندها. null = غير معروف */
+  /** موافقة المذهب المطلوب، ولا تثبت إلا من `cat_id` الرسمي في تراث. */
   madhhabMatch?: {
     madhhab: Exclude<Madhhab, 'all'>;
-    /** من أين عرفنا ذلك: تصنيف الكتاب في المصدر، أو ترجمة المؤلف في المصدر */
-    basis: 'source-category' | 'source-author-bio';
+    basis: 'turath-category';
+    categoryId: number;
     basisText: string;
   } | null;
   /** درجة ترتيب داخلية */
@@ -76,6 +78,16 @@ export interface AnswerClaim {
   evidenceIds: string[];
 }
 
+/** فقرة موثقة؛ كل معرّفاتها اجتازت التحقق من شاهد حرفي داخل المقطع. */
+export interface AnswerParagraph extends AnswerClaim {}
+
+/** بنية الإجابة المنظمة، وهي خريطة الاستشهاد الفعلية فقرة ← أدلة. */
+export interface AnswerSection {
+  /** عنوان موضوعي قصير، بلا حكم مستقل */
+  heading?: string;
+  paragraphs: AnswerParagraph[];
+}
+
 export interface Disagreement {
   topic: string;
   positions: Array<{ position: string; evidenceIds: string[] }>;
@@ -90,8 +102,11 @@ export interface AskResult {
   sourceStatus: SourceStatus[];
   /** الأدلة المستخدمة في الاستشهادات داخل النص (مرتبة) */
   evidence: Evidence[];
-  /** نص الإجابة، أو null عند انعدام أساس حقيقي في الأدلة */
+  /** نص مشتق خادميًا من الفقرات الموثقة، أو null عند انعدام أساس حقيقي. */
   answer: string | null;
+  /** خريطة العرض: كل فقرة ومعرّفات مقاطع تراث التي تثبتها. */
+  answerSections: AnswerSection[];
+  /** نسخة مسطحة من فقرات answerSections لأغراض التدقيق والتوافق. */
   claims: AnswerClaim[];
   disagreements: Disagreement[];
   /** مدى ما تثبته الأدلة: كامل، جزئي، أو معدوم. */
