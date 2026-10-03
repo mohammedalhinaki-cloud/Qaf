@@ -35,6 +35,14 @@ export const metadata: Metadata = {
   keywords: SITE_KEYWORDS,
   applicationName: SITE_NAME,
   manifest: '/manifest.webmanifest',
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/icons/icon-192.png', type: 'image/png', sizes: '192x192' },
+      { url: '/icons/icon-512.png', type: 'image/png', sizes: '512x512' },
+    ],
+    apple: [{ url: '/icons/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
   robots: { index: true, follow: true },
   alternates: { canonical: '/' },
   openGraph: {
@@ -44,11 +52,13 @@ export const metadata: Metadata = {
     siteName: SITE_NAME,
     title: SITE_TAGLINE,
     description: SITE_DESCRIPTION,
+    images: [{ url: '/icons/icon-512.png', width: 512, height: 512, alt: 'شعار حُجَّة' }],
   },
   twitter: {
     card: 'summary',
     title: SITE_TAGLINE,
     description: SITE_DESCRIPTION,
+    images: ['/icons/icon-512.png'],
   },
   appleWebApp: {
     capable: true,
@@ -80,6 +90,7 @@ const structuredData = {
   operatingSystem: 'Web',
   inLanguage: 'ar',
   description: SITE_DESCRIPTION,
+  logo: `${SITE_URL}/icons/icon-512.png`,
 };
 
 /** يضبط السمة قبل أول رسم لتفادي ومضة التبديل. */
