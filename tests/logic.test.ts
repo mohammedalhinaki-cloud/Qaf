@@ -6,6 +6,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { citationLabel, shortBookTitle, splitAnswerText } from '../src/lib/citations.ts';
+import { finalizeSynthesis, type RawSynthesisResult } from '../src/lib/ai/pipeline.ts';
+import { ANSWER_SYSTEM, answerUser } from '../src/lib/ai/prompts.ts';
+import { buildTurathUrl } from '../src/lib/search/turath.ts';
 import {
   TUA_KEY_NAMES,
   cleanSecret,
@@ -208,6 +211,105 @@ test('splitAnswerText يترك الأقواس غير الاستشهادية نص
   assert.equal(cites.length, 1);
   const joined = segs.map((s) => (s.type === 'text' ? s.text : '[استشهاد]')).join('');
   assert.ok(joined.includes('[شرح]'));
+});
+
+/* ———————————— رابط الموضع الدقيق في تراث ———————————— */
+
+test('buildTurathUrl يربط بمعرّف الصفحة الحقيقي ولا يفتح بداية الكتاب', () => {
+  assert.equal(buildTurathUrl(97808, 280, true), 'https://app.turath.io/book/97808/280');
+  assert.equal(buildTurathUrl(97808, undefined, true), null);
+  assert.equal(buildTurathUrl(97808, undefined, false), 'https://app.turath.io/book/97808');
+  assert.equal(buildTurathUrl(97808, 0, true), null);
+});
+
+/* ———————————— طبقة فهم الأدلة وتوليد الإجابة ———————————— */
+
+const synthesisEvidence = [{ id: 'ن1' }, { id: 'ن2' }, { id: 'ن3' }];
+
+function rawSynthesis(partial: Partial<RawSynthesisResult>): RawSynthesisResult {
+  return {
+    coverage: 'complete',
+    answer: 'تثبت الأدلة هذا الحكم بوضوح. [ن1]',
+    claims: [{ text: 'تثبت الأدلة هذا الحكم بوضوح.', evidenceIds: ['ن1'] }],
+    disagreements: [],
+    limitations: [],
+    ...partial,
+  };
+}
+
+test('الصياغة تقبل جوابًا دلاليًا موثقًا ولو لم يكرر ألفاظ السؤال', () => {
+  const result = finalizeSynthesis(
+    rawSynthesis({ answer: 'نعم؛ يدل النص على الجواز من جهة إباحته للفعل المذكور. [ن1]' }),
+    synthesisEvidence,
+  );
+  assert.equal(result.insufficient, false);
+  assert.equal(result.coverage, 'complete');
+  assert.deepEqual(result.usedIds, ['ن1']);
+});
+
+test('الصياغة تحافظ على الجواب الجزئي وتوضح حدود ما لم تثبته الأدلة', () => {
+  const result = finalizeSynthesis(
+    rawSynthesis({
+      coverage: 'partial',
+      answer: 'تثبت المقاطع أصل القول في المسألة. [ن1]',
+      limitations: ['لا تثبت المقاطع ترتيب الأقوال زمنيًا، فلا يمكن وصفه بأنه آخر قول.'],
+    }),
+    synthesisEvidence,
+  );
+  assert.equal(result.insufficient, false);
+  assert.equal(result.coverage, 'partial');
+  assert.match(result.limitations[0]!, /ترتيب الأقوال/);
+});
+
+test('الصياغة تحفظ الأقوال المختلفة منفصلة مع دليل كل قول', () => {
+  const result = finalizeSynthesis(
+    rawSynthesis({
+      answer: 'في المسألة خلاف: يثبت المقطع الأول الوجوب [ن1]، ويثبت الثاني عدم الوجوب [ن2].',
+      disagreements: [{
+        topic: 'حكم المسألة',
+        positions: [
+          { position: 'الوجوب', evidenceIds: ['ن1'] },
+          { position: 'عدم الوجوب', evidenceIds: ['ن2'] },
+        ],
+      }],
+    }),
+    synthesisEvidence,
+  );
+  assert.equal(result.disagreements.length, 1);
+  assert.deepEqual(result.usedIds, ['ن1', 'ن2']);
+});
+
+test('الصياغة لا تعرض جوابًا بلا أساس أو بلا استشهاد حقيقي', () => {
+  const none = finalizeSynthesis(
+    rawSynthesis({ coverage: 'none', answer: '', claims: [], limitations: [] }),
+    synthesisEvidence,
+  );
+  assert.equal(none.insufficient, true);
+  assert.equal(none.answer, null);
+
+  const invented = finalizeSynthesis(
+    rawSynthesis({ answer: 'جواب يبدو كاملًا لكنه يعتمد على إحالة مختلقة. [ن99]' }),
+    synthesisEvidence,
+  );
+  assert.equal(invented.insufficient, true);
+  assert.equal(invented.answer, null);
+
+  const uncitedParagraph = finalizeSynthesis(
+    rawSynthesis({ answer: 'هذه فقرة موثقة بما أعاده المصدر. [ن1]\nوهذه دعوى أخرى تركها النموذج بلا دليل.' }),
+    synthesisEvidence,
+  );
+  assert.equal(uncitedParagraph.insufficient, true);
+});
+
+test('تعليمات النموذج تفرض الفهم الدلالي والجزئية والخلاف وضبط آخر قول', () => {
+  const prompt = answerUser('هل يصح هذا الفعل وما آخر كلام العلماء فيه؟', 'all', [{
+    id: 'ن1', sourceLabel: 'تراث', bookTitle: 'كتاب', text: 'نص الدليل المتاح',
+  }]);
+  assert.match(ANSWER_SYSTEM, /لا يلزم التطابق الحرفي/);
+  assert.match(ANSWER_SYSTEM, /coverage="partial"/);
+  assert.match(ANSWER_SYSTEM, /آخر كلام/);
+  assert.match(ANSWER_SYSTEM, /عند اختلاف الأقوال/);
+  assert.match(prompt, /حلّل دلالة النصوص لا مجرد تطابق الكلمات/);
 });
 
 /* ———————————— قراءة البيئة والمفتاح ———————————— */

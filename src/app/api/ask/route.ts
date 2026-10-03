@@ -205,9 +205,17 @@ export async function POST(req: NextRequest) {
             ? cited
             : evidence.slice(0, 5);
 
+        const sourceNotice = buildSourceNotice(madhhab);
+        const partialNotice = synthesis.coverage === 'partial'
+          ? [
+              'الإجابة التالية جزئية: تعرض ما تثبته المقاطع المسترجعة فقط.',
+              ...synthesis.limitations,
+              sourceNotice,
+            ].filter(Boolean).join(' ')
+          : undefined;
         const notice = synthesis.insufficient
-          ? 'لم أجد في المقاطع المسترجَعة من تراث ما يكفي للإجابة عن هذا السؤال بدقة. المقاطع الأقرب معروضة أدناه للاطلاع.'
-          : buildSourceNotice(madhhab);
+          ? 'لم أجد في المقاطع المسترجَعة من تراث أساسًا حقيقيًا يكفي للإجابة. المقاطع الأقرب معروضة أدناه للاطلاع.'
+          : partialNotice ?? sourceNotice;
 
         const result: AskResult = {
           questionId: crypto.randomUUID(),
@@ -219,6 +227,8 @@ export async function POST(req: NextRequest) {
           answer: synthesis.answer,
           claims: synthesis.claims,
           disagreements: synthesis.disagreements,
+          coverage: synthesis.coverage,
+          limitations: synthesis.limitations,
           insufficient: synthesis.insufficient,
           notice,
           createdAt: Date.now(),

@@ -1,9 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { splitAnswerText } from '@/lib/citations';
 import type { AskResult, Evidence } from '@/lib/types';
-import { CitationChip, CitationPopover } from './Citation';
+import { CitationChip } from './Citation';
 import { EvidenceCard } from './EvidenceCard';
 import { IconAlert } from './icons';
 import { SourceStatusBar } from './SourceStatusBar';
@@ -11,16 +11,14 @@ import { SourceStatusBar } from './SourceStatusBar';
 /**
  * يعرض نص الإجابة مع استشهادات داخلية بجانب الجمل التي تسندها.
  * كل استشهاد مرتبط بمعرّف دليل حقيقي من نتائج البحث في تراث،
- * وعند الضغط عليه تظهر بيانات المصدر كاملة مع رابط الموضع الأصلي.
+ * وعند الضغط عليه يفتح رابط الموضع الأصلي الدقيق في تراث مباشرة.
  */
 function AnswerText({
   text,
   evidenceById,
-  onOpen,
 }: {
   text: string;
   evidenceById: Map<string, Evidence>;
-  onOpen: (ev: Evidence, anchor: DOMRect) => void;
 }) {
   const validIds = useMemo(() => new Set(evidenceById.keys()), [evidenceById]);
   const paragraphs = useMemo(
@@ -42,7 +40,7 @@ function AnswerText({
               seg.type === 'text' ? (
                 <span key={i}>{seg.text}</span>
               ) : (
-                <CitationChip key={`${seg.id}-${i}`} ev={evidenceById.get(seg.id)!} onOpen={onOpen} />
+                <CitationChip key={`${seg.id}-${i}`} ev={evidenceById.get(seg.id)!} />
               ),
             )}
           </p>
@@ -62,15 +60,10 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 export function AnswerBlock({ result }: { result: AskResult }) {
-  const [cite, setCite] = useState<{ ev: Evidence; anchor: DOMRect } | null>(null);
-
   const evidenceById = useMemo(
     () => new Map(result.evidence.map((e) => [e.id, e])),
     [result.evidence],
   );
-
-  const openCite = (ev: Evidence, anchor: DOMRect) => setCite({ ev, anchor });
-  const closeCite = () => setCite(null);
 
   return (
     <div className="space-y-6">
@@ -89,11 +82,10 @@ export function AnswerBlock({ result }: { result: AskResult }) {
 
       {result.answer && (
         <section aria-label="الإجابة">
-          <AnswerText text={result.answer} evidenceById={evidenceById} onOpen={openCite} />
+          <AnswerText text={result.answer} evidenceById={evidenceById} />
           {result.evidence.length > 0 && (
             <p className="mt-2 text-[10.5px] leading-5 text-ink-muted">
-              الاستشهادات الملوّنة داخل النص قابلة للضغط: تعرض بيانات المصدر والنص المستخرج،
-              وتفتح الموضع الأصلي في مكتبة تراث.
+              اضغط على أي استشهاد ملوّن لفتح موضع النص المستشهَد به مباشرة في مكتبة تراث.
             </p>
           )}
         </section>
@@ -112,7 +104,7 @@ export function AnswerBlock({ result }: { result: AskResult }) {
                       <span className="text-ink-muted">—</span> {p.position}
                       {p.evidenceIds.map((id) =>
                         evidenceById.has(id) ? (
-                          <CitationChip key={id} ev={evidenceById.get(id)!} onOpen={openCite} />
+                          <CitationChip key={id} ev={evidenceById.get(id)!} />
                         ) : null,
                       )}
                     </li>
@@ -136,7 +128,6 @@ export function AnswerBlock({ result }: { result: AskResult }) {
         </section>
       )}
 
-      {cite && <CitationPopover key={cite.ev.id} ev={cite.ev} anchor={cite.anchor} onClose={closeCite} />}
     </div>
   );
 }

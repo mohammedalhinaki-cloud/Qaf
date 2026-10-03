@@ -90,11 +90,15 @@ export interface AskResult {
   sourceStatus: SourceStatus[];
   /** الأدلة المستخدمة في الاستشهادات داخل النص (مرتبة) */
   evidence: Evidence[];
-  /** نص الإجابة، أو null عند عدم كفاية الأدلة */
+  /** نص الإجابة، أو null عند انعدام أساس حقيقي في الأدلة */
   answer: string | null;
   claims: AnswerClaim[];
   disagreements: Disagreement[];
-  /** صحيح عندما لم تكفِ الأدلة */
+  /** مدى ما تثبته الأدلة: كامل، جزئي، أو معدوم. */
+  coverage?: 'complete' | 'partial' | 'none';
+  /** ما لم يمكن إثباته من المقاطع في الإجابة الجزئية. */
+  limitations?: string[];
+  /** صحيح فقط عندما لم يوجد أساس موثّق يصلح لإجابة. */
   insufficient: boolean;
   /** ملاحظة عربية تُعرض للمستخدم عند وجود قصور */
   notice?: string;

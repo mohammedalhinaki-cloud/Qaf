@@ -118,10 +118,21 @@ export async function getTurathAuthorBio(authorId: number, signal?: AbortSignal)
   }
 }
 
-function buildUrl(bookId: number | undefined, pageId: number | undefined): string | null {
-  if (!bookId) return null;
-  // عند توفر معرّف الصفحة نفتح الموضع الدقيق، وإلا نفتح الكتاب فقط.
-  const path = pageId ? `/book/${bookId}/${pageId}` : `/book/${bookId}`;
+/**
+ * يبني رابط تراث من المعرّفات التي أعادها المصدر فقط.
+ * إذا أخبرتنا النتيجة أن لها صفحة مطبوعة ولم تعطِ page_id، نرفض رابط بداية
+ * الكتاب بدل إيهام المستخدم بأنه رابط الموضع. لا نحاول تحويل رقم الصفحة
+ * المطبوعة إلى معرّف داخلي بالتخمين.
+ */
+export function buildTurathUrl(
+  bookId: number | undefined,
+  pageId: number | undefined,
+  hasSpecificPage = false,
+): string | null {
+  if (bookId === undefined || !Number.isInteger(bookId) || bookId <= 0) return null;
+  const precise = pageId !== undefined && Number.isInteger(pageId) && pageId > 0;
+  if (hasSpecificPage && !precise) return null;
+  const path = precise ? `/book/${bookId}/${pageId}` : `/book/${bookId}`;
   return safeSourceUrl(`${config.turath.appBase.replace(/\/$/, '')}${path}`, ALLOWED_HOSTS);
 }
 
@@ -147,7 +158,8 @@ export async function searchTurath(
 
   for (const hit of hits) {
     const meta = parseMeta(hit.meta);
-    const url = buildUrl(hit.book_id, meta.page_id);
+    const hasSpecificPage = typeof meta.page === 'number' && meta.page > 0;
+    const url = buildTurathUrl(hit.book_id, meta.page_id, hasSpecificPage);
     const text = toPlainText(hit.text, 6000);
     const bookTitle = toPlainText(meta.book_name, 200);
 
