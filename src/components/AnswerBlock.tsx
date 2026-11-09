@@ -5,7 +5,6 @@ import { splitAnswerText } from '@/lib/citations';
 import type { AnswerSection, AskResult, Evidence } from '@/lib/types';
 import { CitationChip } from './Citation';
 import { EvidenceCard } from './EvidenceCard';
-import { IconAlert } from './icons';
 import { SourceStatusBar } from './SourceStatusBar';
 
 /**
@@ -104,17 +103,6 @@ export function AnswerBlock({ result }: { result: AskResult }) {
   return (
     <div className="space-y-6">
       <SourceStatusBar statuses={result.sourceStatus} queries={result.queries} />
-
-      {result.notice && (
-        <div
-          className="flex gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/[0.07] p-3.5
-                     text-[13px] leading-6 text-amber-800 dark:text-amber-300"
-          role="status"
-        >
-          <IconAlert className="mt-0.5 h-4 w-4 shrink-0" />
-          <p>{result.notice}</p>
-        </div>
-      )}
 
       {result.answer && (
         <section aria-label="الإجابة">
