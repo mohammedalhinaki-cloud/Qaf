@@ -4,7 +4,9 @@
  *
  *   npm run check:openrouter
  *       يقرأ المفتاح من البيئة أو من .env / .env.local / .dev.vars
- *       ويختبره مباشرة لدى OpenRouter (بلا استهلاك يُذكر).
+ *       ويختبره مباشرة لدى المزوّد المضبوط (TUA_BASE_URL؛ الافتراضي OpenRouter).
+ *       يدعم مفتاح Groq (gsk_…) عند ضبط TUA_BASE_URL=https://api.groq.com/openai/v1
+ *       ونفس النموذج openai/gpt-oss-120b.
  *
  *   npm run check:openrouter -- https://hujjah.maaoun.com
  *       يفحص نسخة منشورة عبر /api/health?probe=1 ويشرح النتيجة.
@@ -18,7 +20,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const KEY_NAMES = ['TUA', 'TUA_BUILD'];
 
 const DEFAULT_MODEL = 'openai/gpt-oss-120b';
-const BASE_URL = 'https://openrouter.ai/api/v1';
+const DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1';
+
+const KEY_SHAPE = /^(sk-or-v1-[0-9A-Za-z_-]{20,}|gsk_[0-9A-Za-z_-]{20,})$/;
 
 function cleanSecret(value) {
   if (typeof value !== 'string') return '';
@@ -44,6 +48,13 @@ function parseEnvFile(file) {
     if (k) out[k] = { value: cleanSecret(t.slice(eq + 1)), from: file };
   }
   return out;
+}
+
+function resolveValue(name, fallback) {
+  const fromEnv = cleanSecret(process.env[name]);
+  if (fromEnv) return fromEnv;
+  const files = { ...parseEnvFile('.env'), ...parseEnvFile('.env.local'), ...parseEnvFile('.dev.vars') };
+  return files[name]?.value ?? fallback;
 }
 
 function resolveKey() {
@@ -92,9 +103,9 @@ async function checkRemote(target) {
 
   const ping = data.probe?.openrouter;
   if (ping?.ok) {
-    console.log(`✅ OpenRouter قبل المفتاح والنموذج ${data.ai?.model} متاح (${ping.tookMs}ms).`);
+    console.log(`✅ المزوّد قبل المفتاح والنموذج ${data.ai?.model} متاح (${ping.tookMs}ms).`);
   } else {
-    console.error(`❌ فشل فحص OpenRouter: [${ping?.code}] ${ping?.message}`);
+    console.error(`❌ فشل الفحص لدى المزوّد: [${ping?.code}] ${ping?.message}`);
     process.exit(1);
   }
 
@@ -107,7 +118,8 @@ async function checkRemote(target) {
 }
 
 async function checkLocal() {
-  const model = cleanSecret(process.env.TUA_MODEL) || DEFAULT_MODEL;
+  const model = resolveValue('TUA_MODEL', DEFAULT_MODEL);
+  const baseUrl = resolveValue('TUA_BASE_URL', DEFAULT_BASE_URL).replace(/\/+$/, '');
   const key = resolveKey();
 
   if (!key) {
@@ -118,16 +130,17 @@ async function checkLocal() {
   }
 
   console.log(`🔑 المفتاح: ${key.name} من ${key.from} — ${key.value.length} حرفًا.`);
-  if (!/^sk-or-v1-[0-9A-Za-z_-]{20,}$/.test(key.value)) {
-    console.warn('⚠ شكل المفتاح غير معتاد (المتوقّع يبدأ بـ sk-or-v1-). تحقّق من النسخ.');
+  if (!KEY_SHAPE.test(key.value)) {
+    console.warn('⚠ شكل المفتاح غير معتاد (المتوقّع sk-or-v1-… لـ OpenRouter أو gsk_… لـ Groq). تحقّق من النسخ.');
   }
+  console.log(`🎯 المزوّد: ${baseUrl}`);
 
   const t0 = Date.now();
-  const res = await fetch(`${BASE_URL}/models/${encodeURIComponent(model)}`, {
+  const res = await fetch(`${baseUrl}/models/${encodeURIComponent(model)}`, {
     headers: { Authorization: `Bearer ${key.value}` },
     cache: 'no-store',
   }).catch((e) => {
-    console.error(`❌ تعذّر الاتصال بـ OpenRouter: ${e.message}`);
+    console.error(`❌ تعذّر الاتصال بـ ${baseUrl}: ${e.message}`);
     process.exit(1);
   });
 
@@ -135,7 +148,7 @@ async function checkLocal() {
 
   if (res.ok) {
     console.log(`✅ المفتاح صالح والنموذج «${model}» متاح (${Date.now() - t0}ms).`);
-    console.log(`   نافذة السياق: ${body.context_window ?? '؟'} رمزًا.`);
+    console.log(`   نافذة السياق: ${body.context_window ?? body.context_length ?? '؟'} رمزًا.`);
     return;
   }
 
@@ -145,7 +158,7 @@ async function checkLocal() {
   } else if (res.status === 429) {
     console.error('❌ تجاوز حدّ الاستخدام مؤقتًا؛ أعد المحاولة لاحقًا.');
   } else if (res.status === 401 || res.status === 403 || /api key/i.test(detail)) {
-    console.error('❌ OpenRouter رفض المفتاح. تأكّد أنه من https://openrouter.ai/keys');
+    console.error(`❌ المزوّد رفض المفتاح (${baseUrl}). OpenRouter: https://openrouter.ai/keys — Groq: https://console.groq.com/keys`);
   } else {
     console.error(`❌ خطأ (${res.status}): ${detail.slice(0, 300)}`);
   }

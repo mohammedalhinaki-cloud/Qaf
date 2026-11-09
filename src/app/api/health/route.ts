@@ -30,6 +30,8 @@ export async function GET(req: Request) {
     ai: {
       configured: isOpenRouterConfigured(),
       model: config.openrouter.model,
+      /** الرابط الأساسي الذي تذهب إليه الطلبات (ليس سرًا) — يكشف نسيان TUA_BASE_URL مع مفتاح Groq */
+      baseUrl: config.openrouter.baseUrl,
       key: {
         found: key.configured,
         /** اسم المتغيّر الذي قُرئ منه المفتاح — لا قيمته */
@@ -37,6 +39,7 @@ export async function GET(req: Request) {
         source: key.source,
         length: key.length,
         looksLikeOpenRouterKey: key.looksLikeOpenRouterKey,
+        provider: key.detectedProvider,
         checkedNames: key.checkedNames,
         hint: key.hint,
       },

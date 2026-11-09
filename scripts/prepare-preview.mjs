@@ -102,7 +102,7 @@ if (!key) {
   process.exit(0);
 }
 
-const masked = `${key.value.length} حرفًا${key.value.startsWith('sk-or-v1-') ? '، يبدأ بـ sk-or-v1-' : ''}`;
+const masked = `${key.value.length} حرفًا${key.value.startsWith('sk-or-v1-') ? '، يبدأ بـ sk-or-v1-' : key.value.startsWith('gsk_') ? '، يبدأ بـ gsk_ (Groq)' : ''}`;
 log(`وُجد المفتاح في ${key.name} (${key.from}) — ${masked}.`);
 
 if (!inlineAllowed) {

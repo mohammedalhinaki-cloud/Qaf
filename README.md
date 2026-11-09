@@ -46,7 +46,7 @@ npm run dev                     # http://localhost:3000
 
 | المتغيّر | مطلوب | الوصف |
 |---|---|---|
-| `TUA` | ✅ | من <https://console.openrouter.com/keys> |
+| `TUA` | ✅ | من <https://console.openrouter.com/keys>، أو مفتاح Groq `gsk_…` مع ضبط `TUA_BASE_URL` (انظر «استخدام مفتاح Groq» أدناه) |
 | `TUA_MODEL` | — | الافتراضي `openai/gpt-oss-120b` |
 | `TUA_REASONING_EFFORT` | — | جهد «التفكير» على النماذج الاستدلالية (`low`/`medium`/`high`/`none`). الافتراضي `low` (يمنع الاستجابات الفارغة) |
 | `TUA_BASE_URL` | — | الافتراضي `https://openrouter.ai/api/v1` |
@@ -64,9 +64,22 @@ npm run dev                     # http://localhost:3000
 للتحقق السريع من المفتاح:
 
 ```bash
-npm run check:openrouter                                 # يفحص المفتاح محليًا لدى OpenRouter
+npm run check:openrouter                                 # يفحص المفتاح محليًا لدى المزوّد المضبوط
 npm run check:openrouter -- https://hujjah.maaoun.com    # يفحص النسخة المنشورة
 ```
+
+### استخدام مفتاح Groq (`gsk_…`) بدلًا من OpenRouter
+
+التطبيق يتحدث بروتوكول OpenAI-المتوافق عبر `TUA_BASE_URL`، فيعمل مع Groq **بلا أي تغيير في الكود** — يكفي ضبط ثلاث قيم وقت التشغيل (لا قيم Build):
+
+1. **`TUA`** (Secret) = مفتاحك من [console.groq.com/keys](https://console.groq.com/keys).
+2. **`TUA_BASE_URL`** (متغيّر نصي، غير سري) = `https://api.groq.com/openai/v1` — **بدونه يُرسَل المفتاح إلى OpenRouter فيرفضه (401)**. هذا هو الفرق الوحيد عن ضبط OpenRouter.
+3. **`TUA_MODEL`** (متغيّر نصي، اختياري) = `openai/gpt-oss-120b` — وهو الافتراضي ومتاح على Groq بنفس الاسم، وكذلك `openai/gpt-oss-20b`.
+
+ملاحظات:
+- حد Groq المجاني ~8,000 رمز/دقيقة و1,000 طلب/يوم — قد تصطدم به مع أسئلة طويلة متكررة.
+- الفحص (`npm run check:openrouter`) يقرأ `TUA_BASE_URL` و`TUA_MODEL` من البيئة أو `.env.local`، فيمكن التحقق محليًا قبل النشر.
+- تشخيص المفتاح في `/api/health?probe=1` وConfigBanner يعترف بشكل `gsk_` ويقترح `TUA_BASE_URL` الصحيح عند نسيانه.
 
 ### النشر على Cloudflare والنطاق
 

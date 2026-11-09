@@ -15,6 +15,7 @@
  */
 
 export type EnvSource = 'process.env' | 'cloudflare';
+export type DetectedKeyProvider = 'openrouter' | 'groq';
 
 export interface EnvHit {
   /** اسم المتغيّر الذي وُجدت فيه القيمة فعلًا */
@@ -125,7 +126,17 @@ export function envInt(name: string, fallback: number): number {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
-/* ———————————————— مفتاح OpenRouter ———————————————— */
+/* ———————————————— مفتاح مزوّد النموذج ———————————————— */
+
+const OPENROUTER_KEY_SHAPE = /^sk-or-v1-[0-9A-Za-z_-]{20,}$/;
+const GROQ_KEY_SHAPE = /^gsk_[0-9A-Za-z_-]{20,}$/;
+
+/** يستنتج مزوّد المفتاح من شكله؛ null عند عدم التعرّف عليه. */
+export function detectKeyProvider(value: string): DetectedKeyProvider | null {
+  if (OPENROUTER_KEY_SHAPE.test(value)) return 'openrouter';
+  if (GROQ_KEY_SHAPE.test(value)) return 'groq';
+  return null;
+}
 
 /**
  * أسماء مقبولة للمفتاح. `TUA` هو الاسم الرسمي الوحيد.
@@ -145,8 +156,10 @@ export interface KeyDiagnostics {
   name: string | null;
   source: EnvSource | null;
   length: number;
-  /** هل يشبه شكل مفاتيح OpenRouter (sk-or-v1-…)؟ */
+  /** هل يشبه شكل مفتاح مزوّد معروف (sk-or-v1-… لـ OpenRouter أو gsk_… لـ Groq)؟ */
   looksLikeOpenRouterKey: boolean;
+  /** المزوّد المستنتج من شكل المفتاح، أو null عند عدم التعرّف عليه */
+  detectedProvider: DetectedKeyProvider | null;
   /** الأسماء التي بحثنا عنها، لتسهيل التشخيص */
   checkedNames: string[];
   onCloudflare: boolean;
@@ -169,6 +182,7 @@ export function openrouterKeyDiagnostics(): KeyDiagnostics {
       source: null,
       length: 0,
       looksLikeOpenRouterKey: false,
+      detectedProvider: null,
       hint:
         'لم يُعثر على المفتاح في أي مصدر. على Cloudflare: افتح Worker الخاص بالموقع → Settings → ' +
         'Variables and Secrets → Add → نوع Secret باسم TUA ثم Deploy. ' +
@@ -176,7 +190,8 @@ export function openrouterKeyDiagnostics(): KeyDiagnostics {
     };
   }
 
-  const looksLikeOpenRouterKey = /^sk-or-v1-[0-9A-Za-z_-]{20,}$/.test(hit.value);
+  const provider = detectKeyProvider(hit.value);
+  const looksLikeOpenRouterKey = provider !== null;
   const suspiciousLength = hit.value.length < 20 || hit.value.length > 200;
 
   return {
@@ -186,10 +201,14 @@ export function openrouterKeyDiagnostics(): KeyDiagnostics {
     source: hit.source,
     length: hit.value.length,
     looksLikeOpenRouterKey,
-    hint: looksLikeOpenRouterKey
-      ? 'المفتاح موجود وشكله سليم.'
-      : suspiciousLength
-        ? 'المفتاح موجود لكن طوله غير معتاد؛ تأكّد أنك نسخت المفتاح كاملًا بلا مسافات.'
-        : 'المفتاح موجود لكنه لا يبدأ بـ sk-or-v1-؛ تأكّد أنه مفتاح OpenRouter من openrouter.ai وليس مفتاحًا آخر.',
+    detectedProvider: provider,
+    hint:
+      provider === 'openrouter'
+        ? 'المفتاح موجود وشكله سليم (OpenRouter).'
+        : provider === 'groq'
+          ? 'المفتاح من Groq (يبدأ بـ gsk_). لينجح مع هذا التطبيق اضبط TUA_BASE_URL=https://api.groq.com/openai/v1 كمتغيّر نصي (غير سري) وقت التشغيل؛ تركه على OpenRouter سيجعل المزوّد يرفضه (401).'
+          : suspiciousLength
+            ? 'المفتاح موجود لكن طوله غير معتاد؛ تأكّد أنك نسخت المفتاح كاملًا بلا مسافات.'
+            : 'المفتاح موجود لكنه لا يبدأ بـ sk-or-v1- (OpenRouter) ولا gsk_ (Groq)؛ تأكّد من مصدره وليس مفتاحًا آخر.',
   };
 }
