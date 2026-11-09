@@ -103,9 +103,3 @@ export async function searchAllSources(
   const evidence = ranked.map((ev, i) => ({ ...ev, id: `ن${i + 1}` }));
   return { evidence, statuses: [status] };
 }
-
-/** ملاحظة عربية تصف أثر فلتر المذهب الحقيقي للمستخدم. */
-export function buildSourceNotice(madhhab: Madhhab): string | undefined {
-  if (madhhab === 'all') return undefined;
-  return `فلتر المذهب (${MADHHAB_LABEL[madhhab]}) إقصائي: لا تظهر إلا النتائج التي تحمل تصنيف المذهب الرسمي في بيانات تراث.`;
-}

@@ -4,8 +4,8 @@ import { OpenRouterError, isOpenRouterConfigured } from '@/lib/ai/openrouter';
 import { config } from '@/lib/config';
 import { clientKey, rateLimit } from '@/lib/security/ratelimit';
 import { ValidationError, parseAskRequest } from '@/lib/security/validate';
-import { buildSourceNotice, searchAllSources } from '@/lib/search/orchestrator';
-import { MADHHAB_LABEL, STAGE_LABEL, type AskEvent, type AskResult } from '@/lib/types';
+import { searchAllSources } from '@/lib/search/orchestrator';
+import { STAGE_LABEL, type AskEvent, type AskResult } from '@/lib/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -95,8 +95,6 @@ export async function POST(req: NextRequest) {
             claims: [],
             disagreements: [],
             insufficient: true,
-            notice:
-              'هذا السؤال خارج نطاق ما يمكن البحث عنه في تراث. حُجَّة يبحث في كتب التراث الإسلامي المتوفرة في مكتبة تراث فقط.',
             createdAt: Date.now(),
           };
           send({ type: 'result', result });
@@ -135,7 +133,6 @@ export async function POST(req: NextRequest) {
             claims: [],
             disagreements: [],
             insufficient: true,
-            notice: 'تعذّر الوصول إلى مكتبة تراث حاليًا، لذلك لم أتمكن من التحقق من الإجابة.',
             createdAt: Date.now(),
           };
           send({ type: 'result', result });
@@ -144,9 +141,8 @@ export async function POST(req: NextRequest) {
           return;
         }
 
-        /* ——— لا أدلة: نُصرّح بذلك ——— */
+        /* ——— لا أدلة كافية ——— */
         if (evidence.length === 0) {
-          const disabled = sourceStatus?.status === 'disabled';
           const result: AskResult = {
             questionId: crypto.randomUUID(),
             question,
@@ -159,11 +155,6 @@ export async function POST(req: NextRequest) {
             claims: [],
             disagreements: [],
             insufficient: true,
-            notice: disabled
-              ? 'مصدر البحث (تراث) معطّل في إعدادات الخادم، لذلك لم يتم تنفيذ أي بحث.'
-              : madhhab !== 'all'
-                ? `لم تُرجع نتائج البحث مصدرًا مصنّفًا في تراث ضمن المذهب ${MADHHAB_LABEL[madhhab]}. لم تُعرض المصادر غير المصنّفة بهذا المذهب.`
-                : 'لم أجد مادة كافية في مكتبة تراث عن هذا السؤال بهذه الصياغة. جرّب صياغة أدق أو مصطلحًا فقهيًا أقرب.',
             createdAt: Date.now(),
           };
           send({ type: 'result', result });
@@ -179,8 +170,7 @@ export async function POST(req: NextRequest) {
           synthesis = await synthesizeAnswer(question, madhhab, evidence, req.signal);
         } catch (e) {
           // فشل النموذج بعد نجاح البحث: لا نُضيّع مادة حقيقية استُرجعت فعلًا.
-          // نعرض المقاطع كما هي ونوضّح أن الصياغة لم تتم. ولا نعرض أي إجابة.
-          const reason = e instanceof OpenRouterError ? e.message : 'تعذّرت صياغة الإجابة.';
+          // نعرض المقاطع كما هي دون صياغة. ولا نعرض أي إجابة.
           const result: AskResult = {
             questionId: crypto.randomUUID(),
             question,
@@ -193,7 +183,6 @@ export async function POST(req: NextRequest) {
             claims: [],
             disagreements: [],
             insufficient: true,
-            notice: `${reason} عُثر على المقاطع التالية في تراث، وهي معروضة كما وردت دون صياغة.`,
             createdAt: Date.now(),
           };
           send({ type: 'result', result });
@@ -211,18 +200,6 @@ export async function POST(req: NextRequest) {
             ? cited
             : evidence.slice(0, 5);
 
-        const sourceNotice = buildSourceNotice(madhhab);
-        const partialNotice = synthesis.coverage === 'partial'
-          ? [
-              'الإجابة التالية جزئية: تعرض ما تثبته المقاطع المسترجعة فقط.',
-              ...synthesis.limitations,
-              sourceNotice,
-            ].filter(Boolean).join(' ')
-          : undefined;
-        const notice = synthesis.insufficient
-          ? 'لم أجد في المقاطع المسترجَعة من تراث أساسًا حقيقيًا يكفي للإجابة. المقاطع الأقرب معروضة أدناه للاطلاع.'
-          : partialNotice ?? sourceNotice;
-
         const result: AskResult = {
           questionId: crypto.randomUUID(),
           question,
@@ -237,7 +214,6 @@ export async function POST(req: NextRequest) {
           coverage: synthesis.coverage,
           limitations: synthesis.limitations,
           insufficient: synthesis.insufficient,
-          notice,
           createdAt: Date.now(),
         };
 

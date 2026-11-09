@@ -115,8 +115,6 @@ export interface AskResult {
   limitations?: string[];
   /** صحيح فقط عندما لم يوجد أساس موثّق يصلح لإجابة. */
   insufficient: boolean;
-  /** ملاحظة عربية تُعرض للمستخدم عند وجود قصور */
-  notice?: string;
   createdAt: number;
 }
 
