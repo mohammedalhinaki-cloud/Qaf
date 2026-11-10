@@ -1,6 +1,6 @@
 /**
  * إعدادات التطبيق. تُقرأ من متغيّرات البيئة على الخادم فقط.
- * لا يوجد أي مفتاح أو سر في هذا الملف، ولا يُستورد من مكوّنات العميل.
+ * الإعدادات خادمية، ولا تُستورد من مكوّنات العميل.
  *
  * مهم: كل القيم هنا **كسولة** (getters) وتُقرأ لحظة الاستعمال، لأن أسرار
  * Cloudflare Workers لا تتوفّر وقت تحميل الوحدات. انظر `src/lib/env.ts`.
@@ -8,8 +8,8 @@
 
 import { envBool, envInt, envString, resolveOpenRouterKey } from '@/lib/env';
 
-export const DEFAULT_TUA_MODEL = 'openai/gpt-oss-120b';
-export const DEFAULT_TUA_BASE_URL = 'https://openrouter.ai/api/v1';
+export const DEFAULT_TUA_MODEL = 'llama-3.3-70b-versatile';
+export const DEFAULT_TUA_BASE_URL = 'https://api.groq.com/openai/v1';
 
 /**
  * جهد «التفكير» (reasoning_effort) في النماذج الاستدلالية مثل gpt-oss:
@@ -31,10 +31,10 @@ export const config = {
       return resolveOpenRouterKey()?.value ?? '';
     },
     get model(): string {
-      return envString('TUA_MODEL', DEFAULT_TUA_MODEL);
+      return DEFAULT_TUA_MODEL;
     },
     get baseUrl(): string {
-      return envString('TUA_BASE_URL', DEFAULT_TUA_BASE_URL).replace(/\/+$/, '');
+      return DEFAULT_TUA_BASE_URL;
     },
     get reasoningEffort(): string | null {
       return reasoningEffort();

@@ -36,7 +36,7 @@ export async function GET(req: Request) {
         variable: key.name,
         source: key.source,
         length: key.length,
-        looksLikeOpenRouterKey: key.looksLikeOpenRouterKey,
+        looksLikeGroqKey: key.looksLikeOpenRouterKey,
         checkedNames: key.checkedNames,
         hint: key.hint,
       },
