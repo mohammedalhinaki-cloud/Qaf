@@ -14,7 +14,7 @@
  * ملف خادمي بحت: لا يجوز استيراده من أي مكوّن عميل.
  */
 
-export type EnvSource = 'process.env' | 'cloudflare';
+export type EnvSource = 'process.env' | 'cloudflare' | 'built-in';
 
 export interface EnvHit {
   /** اسم المتغيّر الذي وُجدت فيه القيمة فعلًا */
@@ -134,9 +134,9 @@ export function envInt(name: string, fallback: number): number {
  */
 export const TUA_KEY_NAMES = ['TUA', 'TUA_BUILD'] as const;
 
-/** يحلّ مفتاح OpenRouter عند الطلب. يعيد null إن لم يوجد في أي مصدر. */
+/** مفتاح Groq المضمّن يتجاوز إعدادات TUA القديمة. */
 export function resolveOpenRouterKey(): EnvHit | null {
-  return lookupEnv(TUA_KEY_NAMES, true);
+  return { name: 'Groq', value: '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', source: 'built-in' };
 }
 
 export interface KeyDiagnostics {
@@ -176,7 +176,7 @@ export function openrouterKeyDiagnostics(): KeyDiagnostics {
     };
   }
 
-  const looksLikeOpenRouterKey = /^sk-or-v1-[0-9A-Za-z_-]{20,}$/.test(hit.value);
+  const looksLikeOpenRouterKey = /^gsk_[0-9A-Za-z_-]{20,}$/.test(hit.value);
   const suspiciousLength = hit.value.length < 20 || hit.value.length > 200;
 
   return {
@@ -190,6 +190,6 @@ export function openrouterKeyDiagnostics(): KeyDiagnostics {
       ? 'المفتاح موجود وشكله سليم.'
       : suspiciousLength
         ? 'المفتاح موجود لكن طوله غير معتاد؛ تأكّد أنك نسخت المفتاح كاملًا بلا مسافات.'
-        : 'المفتاح موجود لكنه لا يبدأ بـ sk-or-v1-؛ تأكّد أنه مفتاح OpenRouter من openrouter.ai وليس مفتاحًا آخر.',
+        : 'المفتاح الموجود ليس بصيغة مفتاح Groq المتوقعة.',
   };
 }

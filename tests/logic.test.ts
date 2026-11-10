@@ -492,26 +492,14 @@ test('lookupEnv يقرأ من process.env عند الطلب لا عند التح
   delete process.env.HUJJAH_TEST_KEY;
 });
 
-test('resolveOpenRouterKey يقبل الاسم الاحتياطي ويفضّل الاسم الرسمي', () => {
-  for (const n of TUA_KEY_NAMES) delete process.env[n];
-  assert.equal(resolveOpenRouterKey(), null);
-
-  process.env.TUA_BUILD = 'sk-or-v1-REDACTED';
-  assert.equal(resolveOpenRouterKey()?.name, 'TUA_BUILD');
-
-  process.env.TUA = 'sk-or-v1-REDACTED';
-  assert.equal(resolveOpenRouterKey()?.name, 'TUA');
-  assert.equal(resolveOpenRouterKey()?.value, 'sk-or-v1-REDACTED');
-
-  for (const n of TUA_KEY_NAMES) delete process.env[n];
-});
-
-test('openrouterKeyDiagnostics لا يكشف قيمة المفتاح', () => {
-  process.env.TUA = `sk-or-v1-${'x'.repeat(40)}`;
-  const d = openrouterKeyDiagnostics();
-  assert.equal(d.configured, true);
-  assert.equal(d.name, 'TUA');
-  assert.equal(d.looksLikeOpenRouterKey, true);
-  assert.ok(!JSON.stringify(d).includes('xxxxx'));
+test('المفتاح المضمّن يتجاوز المفتاح القديم ولا يظهر في التشخيص', () => {
+  process.env.TUA = 'sk-or-v1-old-key';
+  const hit = resolveOpenRouterKey();
+  const diagnostics = openrouterKeyDiagnostics();
+  assert.equal(hit?.source, 'built-in');
+  assert.match(hit?.value ?? '', /^gsk_/);
+  assert.equal(diagnostics.configured, true);
+  assert.equal(diagnostics.looksLikeOpenRouterKey, true);
+  assert.ok(!JSON.stringify(diagnostics).includes(hit!.value));
   delete process.env.TUA;
 });

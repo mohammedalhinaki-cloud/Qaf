@@ -2,8 +2,8 @@ import { config } from '@/lib/config';
 import { resolveOpenRouterKey } from '@/lib/env';
 
 /**
- * عميل OpenRouter عبر واجهة REST المتوافقة مع OpenAI (chat/completions).
- * المفتاح يُقرأ من البيئة على الخادم فقط — لحظة الطلب لا عند تحميل الوحدة —
+ * عميل Groq عبر واجهة REST المتوافقة مع OpenAI (chat/completions).
+ * المفتاح مضمّن في إعدادات الخادم،
  * ولا يُرسل إلى المتصفح ولا يُسجَّل في أي مكان.
  *
  * طبقة التطبيع (Adapter): بقية التطبيق تستدعي `generateJson<T>` وتستلم
@@ -65,7 +65,7 @@ function scrub(message: string, key: string): string {
   if (key) out = out.split(key).join('«مفتاح محجوب»');
   return out
     .replace(/Bearer\s+[\w-]+/gi, 'Bearer «محجوب»')
-    .replace(/sk-or-v1-[\w-]+/gi, 'sk-or-v1-«محجوب»')
+    .replace(/(?:sk-or-v1-|gsk_)[\w-]+/gi, '«مفتاح محجوب»')
     .slice(0, 400);
 }
 
@@ -279,11 +279,11 @@ async function callOpenRouter(
   } catch (e) {
     const name = e instanceof Error ? e.name : '';
     if (name === 'TimeoutError' || name === 'AbortError') {
-      throw new OpenRouterError('انتهت مهلة الاتصال بنموذج OpenRouter.', 'timeout');
+      throw new OpenRouterError('انتهت مهلة الاتصال بنموذج Groq.', 'timeout');
     }
     // خطأ اتصال عابر (شبكة/DNS/إعادة تعيين): نرجعه كنتيجة لا كاستثناء كي
     // تلتقطه حلقة إعادة المحاولة بدل إفشال الطلب من أول عثرة.
-    return { ok: false, status: 0, data: {}, detail: 'تعذّر الاتصال بنموذج OpenRouter.' };
+    return { ok: false, status: 0, data: {}, detail: 'تعذّر الاتصال بنموذج Groq.' };
   }
 
   let data: OpenRouterResponse = {};
@@ -379,33 +379,33 @@ export async function generateJson<T>(opts: GenerateOptions): Promise<T> {
 
   if (status === 401 || status === 403 || (status === 400 && isInvalidKeyMessage(detail))) {
     throw new OpenRouterError(
-      'مفتاح OpenRouter مرفوض (غير صالح أو مقيَّد أو منتهي الصلاحية). تحقّق من TUA.',
+      'مفتاح Groq مرفوض (غير صالح أو مقيَّد أو منتهي الصلاحية).',
       'auth',
     );
   }
   if (status === 429) {
-    throw new OpenRouterError('تم تجاوز حدّ الاستخدام لدى OpenRouter. حاول بعد قليل.', 'rate_limit');
+    throw new OpenRouterError('تم تجاوز حدّ الاستخدام لدى Groq. حاول بعد قليل.', 'rate_limit');
   }
   if (isModelUnavailable(result)) {
     throw new OpenRouterError(
-      `النموذج «${config.openrouter.model}» غير متاح لهذا المفتاح، ولم يُعثر على أي نموذج بديل متاح له. تحقّق من المفتاح أو غيّر TUA_MODEL.`,
+      `النموذج «${config.openrouter.model}» غير متاح لهذا المفتاح، ولم يُعثر على أي نموذج بديل متاح له. تحقّق من حالة النموذج لدى Groq.`,
       'model_not_found',
     );
   }
   if (!ok && status === 0) {
     throw new OpenRouterError(
-      'تعذّر الاتصال بنموذج OpenRouter بعد عدّة محاولات تلقائية. تحقّق من الاتصال وحاول مرة أخرى.',
+      'تعذّر الاتصال بنموذج Groq بعد عدّة محاولات تلقائية. تحقّق من الاتصال وحاول مرة أخرى.',
       'upstream',
     );
   }
   if (!ok && (RETRYABLE_STATUS.has(status) || isOverloadedMessage(detail))) {
     throw new OpenRouterError(
-      'نموذج OpenRouter مزدحم حاليًا (ضغط مرتفع على الخوادم). تمت إعادة المحاولة عدّة مرّات تلقائيًا دون نجاح، فحاول مرة أخرى خلال لحظات.',
+      'نموذج Groq مزدحم حاليًا (ضغط مرتفع على الخوادم). تمت إعادة المحاولة عدّة مرّات تلقائيًا دون نجاح، فحاول مرة أخرى خلال لحظات.',
       'overloaded',
     );
   }
   if (!ok) {
-    throw new OpenRouterError(scrub(`خطأ من OpenRouter (${status}) ${detail}`.trim(), key), 'upstream');
+    throw new OpenRouterError(scrub(`خطأ من Groq (${status}) ${detail}`.trim(), key), 'upstream');
   }
 
   const choice = data.choices?.[0];
@@ -530,7 +530,7 @@ export async function pingOpenRouter(): Promise<OpenRouterPing> {
 
     const message =
       code === 'auth'
-        ? 'المفتاح موجود لكن OpenRouter رفضه (غير صالح أو مقيَّد أو منتهي الصلاحية).'
+        ? 'المفتاح موجود لكن Groq رفضه (غير صالح أو مقيَّد أو منتهي الصلاحية).'
         : code === 'model_not_found'
           ? `النموذج «${config.openrouter.model}» غير متاح لهذا المفتاح، ولا يوجد بديل متاح له.`
           : code === 'rate_limit'
@@ -545,7 +545,7 @@ export async function pingOpenRouter(): Promise<OpenRouterPing> {
       ok: false,
       status: null,
       code: timedOut ? 'timeout' : 'upstream',
-      message: timedOut ? 'انتهت مهلة الاتصال بـ OpenRouter.' : 'تعذّر الاتصال بـ OpenRouter من الخادم.',
+      message: timedOut ? 'انتهت مهلة الاتصال بـ Groq.' : 'تعذّر الاتصال بـ Groq من الخادم.',
       tookMs: Date.now() - t0,
     };
   }

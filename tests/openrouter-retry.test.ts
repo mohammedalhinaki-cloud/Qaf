@@ -133,3 +133,24 @@ test('generateJson لا يعيد المحاولة عند 429 (تجاوز الح�
     clearKey();
   }
 });
+
+test('يستخدم Groq والمفتاح المضمّن بدل إعدادات المزود القديم', async () => {
+  setKey();
+  process.env.TUA_BASE_URL = 'https://old.example/api/v1';
+  process.env.TUA_MODEL = 'old-model';
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input, init) => {
+    assert.equal(String(input), 'https://api.groq.com/openai/v1/chat/completions');
+    assert.match(new Headers(init?.headers).get('Authorization') ?? '', /^Bearer gsk_/);
+    assert.equal(JSON.parse(String(init?.body)).model, 'llama-3.3-70b-versatile');
+    return jsonResponse(200, okBody({ ok: true }));
+  }) as typeof fetch;
+  try {
+    assert.deepEqual(await generateJson({ system: 'sys', user: 'user' }), { ok: true });
+  } finally {
+    globalThis.fetch = originalFetch;
+    delete process.env.TUA_BASE_URL;
+    delete process.env.TUA_MODEL;
+    clearKey();
+  }
+});
